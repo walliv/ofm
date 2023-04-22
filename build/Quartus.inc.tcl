@@ -268,6 +268,10 @@ proc SynthesizeDesignRun {synth_flags} {
     PrintLabel "Synthesize"
 
     execute_module -tool syn
+
+    if {[catch {execute_module -tool syn}]} {
+        execute_module -tool map
+    }
 }
 
 # -----------------------------------------------------------------------------
