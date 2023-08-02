@@ -1,6 +1,7 @@
 -- tx_dma_metadata_extractor.vhd: performs initial processing of packets comming to the DMA
 -- Copyright (C) 2023 CESNET z.s.p.o.
 -- Author(s): Vladislav Valek  <xvalek14@vutbr.cz>
+--            David Benes      <xbenes52@vutbr.cz>
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 
