@@ -27,7 +27,7 @@ entity TX_DMA_METADATA_EXTRACTOR is
         -- Pointer with respect to bytes
         POINTER_WIDTH  : natural := 16;
 
-        PCIE_MFB_REGIONS     : natural := 1;
+        PCIE_MFB_REGIONS     : natural := 2;
         PCIE_MFB_REGION_SIZE : natural := 1;
         PCIE_MFB_BLOCK_SIZE  : natural := 8;
         PCIE_MFB_ITEM_WIDTH  : natural := 32
@@ -41,7 +41,7 @@ entity TX_DMA_METADATA_EXTRACTOR is
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH-1 downto 0);
         -- More information about the content of this port can be found in *pcie_meta_pack*
-        PCIE_MFB_META    : in  std_logic_vector(PCIE_CQ_META_WIDTH -1 downto 0);
+        PCIE_MFB_META    : in  std_logic_vector(PCIE_MFB_REGIONS*PCIE_CQ_META_WIDTH -1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         PCIE_MFB_SOF_POS : in  std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
@@ -111,12 +111,12 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     -- Internal Signals
     -- =============================================================================================
     -- extracted fields from the PCIe header
-    signal pcie_hdr_addr         : std_logic_vector(63 downto 0);
-    signal pcie_hdr_bar_id       : std_logic_vector(2 downto 0);
-    signal pcie_hdr_bar_aperture : std_logic_vector(5 downto 0);
-    signal pcie_hdr_fbe          : std_logic_vector(3 downto 0);
-    signal pcie_hdr_lbe          : std_logic_vector(3 downto 0);
-    signal pcie_hdr_dw_count     : std_logic_vector(10 downto 0);
+    signal pcie_hdr_addr         : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
+    signal pcie_hdr_bar_id       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(2 downto 0);
+    signal pcie_hdr_bar_aperture : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(5 downto 0);
+    signal pcie_hdr_fbe          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
+    signal pcie_hdr_lbe          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
+    signal pcie_hdr_dw_count     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(10 downto 0);
 
     signal pcie_addr_mask   : std_logic_vector(63 downto 0);
     signal pcie_addr_masked : std_logic_vector(63 downto 0);
@@ -180,30 +180,35 @@ begin
 
     -- =============================================================================================
 
-    pcie_hdr_deparser_i : entity work.PCIE_CQ_HDR_DEPARSER
-        generic map (
-            DEVICE => DEVICE)
-        port map (
-            OUT_TAG          => open,
-            OUT_ADDRESS      => pcie_hdr_addr,
-            OUT_REQ_ID       => open,
-            OUT_TC           => open,
-            OUT_DW_CNT       => pcie_hdr_dw_count,
-            OUT_ATTRIBUTES   => open,
-            OUT_FBE          => pcie_hdr_fbe,
-            OUT_LBE          => pcie_hdr_lbe,
-            OUT_ADDRESS_TYPE => open,
-            OUT_TARGET_FUNC  => open,
-            OUT_BAR_ID       => pcie_hdr_bar_id,
-            OUT_BAR_APERTURE => pcie_hdr_bar_aperture,
-            OUT_ADDR_LEN     => open,
-            OUT_REQ_TYPE     => open,
+    pcie_hdr_deparser_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        pcie_hdr_deparser_i : entity work.PCIE_CQ_HDR_DEPARSER
+            generic map (
+                DEVICE => DEVICE)
+            port map (
+                OUT_TAG          => open,
+                OUT_ADDRESS      => pcie_hdr_addr(i),
+                OUT_REQ_ID       => open,
+                OUT_TC           => open,
+                OUT_DW_CNT       => pcie_hdr_dw_count(i),
+                OUT_ATTRIBUTES   => open,
+                OUT_FBE          => pcie_hdr_fbe(i),
+                OUT_LBE          => pcie_hdr_lbe(i),
+                OUT_ADDRESS_TYPE => open,
+                OUT_TARGET_FUNC  => open,
+                OUT_BAR_ID       => pcie_hdr_bar_id(i),
+                OUT_BAR_APERTURE => pcie_hdr_bar_aperture(i),
+                OUT_ADDR_LEN     => open,
+                OUT_REQ_TYPE     => open,
 
-            IN_HEADER     => PCIE_MFB_DATA(PCIE_CQ_META_HEADER),
-            IN_FBE        => PCIE_MFB_META(PCIE_CQ_META_FBE),
-            IN_LBE        => PCIE_MFB_META(PCIE_CQ_META_LBE),
-            -- TODO: connect this for Intel FPGA
-            IN_INTEL_META => (others => '0'));
+                -- TODO: Region specific
+                IN_HEADER     => PCIE_MFB_DATA(PCIE_CQ_META_HEADER),
+                IN_FBE        => PCIE_MFB_META(PCIE_CQ_META_FBE),
+                IN_LBE        => PCIE_MFB_META(PCIE_CQ_META_LBE),
+
+                -- TODO: connect this for Intel FPGA
+                IN_INTEL_META => (others => '0')
+            );
+    end generate;
 
     -- =============================================================================================
     -- creates mask for pcie addr based on the BAR APERTURE value in the PCIE header
