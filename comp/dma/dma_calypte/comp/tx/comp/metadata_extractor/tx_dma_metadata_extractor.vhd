@@ -239,7 +239,7 @@ begin
     -- =============================================================================================
     addr_mask_gen_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
         addr_mask_gen_p : process (all)
-            variable mask_var : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
+            variable mask_var : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63  downto 0);
         begin
             mask_var(i) := (others => '0');
             for j in 0 to 63 loop
@@ -363,6 +363,10 @@ begin
             TX_ITEM_VLD      => mfb_aux_item_vld_int
         );
 
+    ------------------------------------------------------------------------------------
+    ---                                 DEBUG_NEEDED                                 ---
+    ------------------------------------------------------------------------------------
+
     -- This quasi state machine stores the LBE value till the end of a packet
     aux_mfb_meta_arr    <= slv_array_deser(aux_mfb_meta, PCIE_MFB_REGIONS);
     lbe_fsm_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
@@ -381,7 +385,7 @@ begin
         begin
             usr_mfb_lbe_nst(i) <= usr_mfb_lbe_pst(i);
 
-            if (aux_mfb_sof(i) = '1' and aux_mfb_eof(i) = '1') then
+            if (aux_mfb_sof(i) = '1' and aux_mfb_eof(i) = '0') then
                 usr_mfb_lbe_nst(i) <= aux_mfb_meta_arr(i)(META_LBE);
             end if;
         end process;
@@ -405,7 +409,7 @@ begin
                 end if;
 
                 -- apply LBE to the BE vector
-                if (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '1') then
+                if (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '0') then
                     mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= usr_mfb_lbe_pst(i);
                 elsif (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '1' and unsigned(aux_mfb_eof_pos_arr(i)) > 0) then
                     mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= aux_mfb_meta_arr(i)(META_LBE);
@@ -413,7 +417,9 @@ begin
             end if;
         end process;
     end generate;
-
+    ------------------------------------------------------------------------------------
+    ---                                 DEBUG_NEEDED                                 ---
+    ------------------------------------------------------------------------------------
     usr_mfb_meta_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
         usr_mfb_meta_is_dma_hdr_arr(i)     <= aux_mfb_meta_arr(i)(META_IS_DMA_HDR);
         usr_mfb_meta_is_dma_hdr_1d_arr(i)  <= usr_mfb_meta_is_dma_hdr_arr(i)(0);
