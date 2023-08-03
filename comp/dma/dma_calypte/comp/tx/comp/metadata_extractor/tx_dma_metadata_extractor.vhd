@@ -55,11 +55,11 @@ entity TX_DMA_METADATA_EXTRACTOR is
         -- Metadata are all valid with SOF except for USR_MFB_META_BYTE_EN.
         -- =========================================================================================
         -- One bit indication if a current transaction contains DMA header.
-        USR_MFB_META_IS_DMA_HDR : out std_logic;
+        USR_MFB_META_IS_DMA_HDR : out std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
         -- Processed adress from the PCIe header of a current transaction.
-        USR_MFB_META_PCIE_ADDR  : out std_logic_vector(62 -1 downto 0);
+        USR_MFB_META_PCIE_ADDR  : out std_logic_vector(PCIE_MFB_REGIONS*62 -1 downto 0);
         -- Index of a channel.
-        USR_MFB_META_CHAN_NUM   : out std_logic_vector(log2(CHANNELS) -1 downto 0);
+        USR_MFB_META_CHAN_NUM   : out std_logic_vector(PCIE_MFB_REGIONS*log2(CHANNELS) - 1 downto 0);
         -- Byte enable for every MFB word where frame is transmitted. Calculated from Byte Enable
         -- signals of the PCIe transaction.
         USR_MFB_META_BYTE_EN    : out std_logic_vector((PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8 -1 downto 0);
@@ -110,6 +110,10 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     -- =============================================================================================
     -- Internal Signals
     -- =============================================================================================
+    -- Input port arrays
+    signal pcie_mfb_data_arr     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH-1 downto 0);
+    signal pcie_mfb_meta_arr     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_CQ_META_WIDTH -1 downto 0);
+
     -- extracted fields from the PCIe header
     signal pcie_hdr_addr         : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
     signal pcie_hdr_bar_id       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(2 downto 0);
@@ -118,24 +122,26 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal pcie_hdr_lbe          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
     signal pcie_hdr_dw_count     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(10 downto 0);
 
-    signal pcie_addr_mask   : std_logic_vector(63 downto 0);
-    signal pcie_addr_masked : std_logic_vector(63 downto 0);
+    signal pcie_addr_mask        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
+    signal pcie_addr_masked      : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
 
     -- decoded FBE and LBE signals with continuous rows of 1s
-    signal fbe_decoded           : std_logic_vector(3 downto 0);
-    signal lbe_decoded           : std_logic_vector(3 downto 0);
+    signal fbe_decoded           : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
+    signal lbe_decoded           : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
 
-    signal chan_num_int      : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(CHANNELS)) -1 downto 0);
+    signal chan_num_int          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(max(1, log2(CHANNELS)) -1 downto 0);
+
     -- Determines if curently contained payload of the incoming PCIe transaction is a DMA header
-    signal is_dma_hdr        : std_logic;
+    signal is_dma_hdr        : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
+
     -- contains the last byte enable, first byte enable signals from the PCIE META input, the size
     -- of a current PCIE transaction in bytes and one bit indication if DMA header is included in a
     -- current transaction
-    signal pcie_mfb_meta_int : std_logic_vector(META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto 0);
-    signal pcie_tr_byte_cnt  : std_logic_vector(META_BYTE_CNT_W -1 downto 0);
+    signal pcie_mfb_meta_int : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_LBE_O + META_LBE_W -1 downto 0);
+    signal pcie_tr_byte_cnt  : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_BYTE_CNT_W -1 downto 0);
 
     signal cutt_mfb_data    : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal cutt_mfb_meta    : std_logic_vector(META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto 0);
+    signal cutt_mfb_meta    : std_logic_vector(PCIE_MFB_REGIONS*(META_BYTE_CNT_O + META_BYTE_CNT_W) -1 downto 0);
     signal cutt_mfb_sof     : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
     signal cutt_mfb_eof     : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
     signal cutt_mfb_sof_pos : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
@@ -143,42 +149,61 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal cutt_mfb_src_rdy : std_logic;
     signal cutt_mfb_dst_rdy : std_logic;
 
-    signal aux_mfb_data    : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal aux_mfb_meta    : std_logic_vector(META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto 0);
-    signal aux_mfb_sof     : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
-    signal aux_mfb_eof     : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
-    signal aux_mfb_sof_pos : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
-    signal aux_mfb_eof_pos : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE)) -1 downto 0);
-    signal aux_mfb_src_rdy : std_logic;
-    signal aux_mfb_dst_rdy : std_logic;
+    signal aux_mfb_data         : std_logic_vector(MFB_LENGTH -1 downto 0);
+    signal aux_mfb_meta         : std_logic_vector(PCIE_MFB_REGIONS*(META_BYTE_CNT_O + META_BYTE_CNT_W) - 1 downto 0);
+    signal aux_mfb_meta_arr     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_BYTE_CNT_O + META_BYTE_CNT_W - 1 downto 0);
+    signal aux_mfb_sof          : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
+    signal aux_mfb_eof          : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
+    signal aux_mfb_sof_pos      : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
+    signal aux_mfb_eof_pos      : std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE)) -1 downto 0);
+    signal aux_mfb_eof_pos_arr  : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(max(1, log2(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE)) -1 downto 0);
+    signal aux_mfb_src_rdy      : std_logic;
+    signal aux_mfb_dst_rdy      : std_logic;
 
-    signal usr_mfb_lbe_pst : std_logic_vector(META_LBE_W -1 downto 0);
-    signal usr_mfb_lbe_nst : std_logic_vector(META_LBE_W -1 downto 0);
+    signal usr_mfb_lbe_pst : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_LBE_W -1 downto 0);
+    signal usr_mfb_lbe_nst : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_LBE_W -1 downto 0);
 
     -- indicates which items in a current word are valid
-    signal mfb_aux_item_vld_int : std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0);
+    signal mfb_aux_item_vld_int     : std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0);
+    signal mfb_aux_item_vld_int_arr : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0);
+
     -- byte enable for a whole word
-    signal mfb_aux_item_be      : slv_array_t(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0)(PCIE_MFB_ITEM_WIDTH/8 -1 downto 0);
+    signal mfb_aux_item_be      : slv_array_2d_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0)(PCIE_MFB_ITEM_WIDTH/8 -1 downto 0);
+
+    -- Multiple regions for USR_META ports
+    signal usr_mfb_meta_is_dma_hdr_1d_arr   : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
+    signal usr_mfb_meta_is_dma_hdr_arr      : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_IS_DMA_HDR);
+    signal usr_mfb_meta_pcie_addr_arr       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(62 -1 downto 0);
+    signal usr_mfb_meta_chan_num_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(log2(CHANNELS) - 1 downto 0);
+
 begin
     -- ============================================================================================
     -- DEBUGGING
     -- ============================================================================================
-    pcie_byte_count_i : entity work.PCIE_BYTE_COUNT
-        generic map (
-            OUTPUT_REG => FALSE)
-        port map (
-            CLK            => CLK,
-            RESET          => RESET,
+    pcie_byte_count_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        pcie_byte_count_i : entity work.PCIE_BYTE_COUNT
+            generic map (
+                OUTPUT_REG => FALSE
+            )
+            port map (
+                CLK            => CLK,
+                RESET          => RESET,
 
-            IN_DW_COUNT    => pcie_hdr_dw_count,
-            IN_FIRST_BE    => pcie_hdr_fbe,
-            IN_LAST_BE     => pcie_hdr_lbe,
+                IN_DW_COUNT    => pcie_hdr_dw_count(i),
+                IN_FIRST_BE    => pcie_hdr_fbe(i),
+                IN_LAST_BE     => pcie_hdr_lbe(i),
 
-            OUT_FIRST_IB   => open,
-            OUT_LAST_IB    => open,
-            OUT_BYTE_COUNT => pcie_tr_byte_cnt);
+                OUT_FIRST_IB   => open,
+                OUT_LAST_IB    => open,
+                OUT_BYTE_COUNT => pcie_tr_byte_cnt(i)
+            );
+    end generate;
 
     -- =============================================================================================
+    -- Deserialize input data
+    -- =============================================================================================
+    pcie_mfb_data_arr   <= slv_array_deser(PCIE_MFB_DATA, PCIE_MFB_REGIONS);
+    pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
 
     pcie_hdr_deparser_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
         pcie_hdr_deparser_i : entity work.PCIE_CQ_HDR_DEPARSER
@@ -200,10 +225,9 @@ begin
                 OUT_ADDR_LEN     => open,
                 OUT_REQ_TYPE     => open,
 
-                -- TODO: Region specific
-                IN_HEADER     => PCIE_MFB_DATA(PCIE_CQ_META_HEADER),
-                IN_FBE        => PCIE_MFB_META(PCIE_CQ_META_FBE),
-                IN_LBE        => PCIE_MFB_META(PCIE_CQ_META_LBE),
+                IN_HEADER     => pcie_mfb_data_arr(i)(PCIE_CQ_META_HEADER),
+                IN_FBE        => pcie_mfb_meta_arr(i)(PCIE_CQ_META_FBE),
+                IN_LBE        => pcie_mfb_meta_arr(i)(PCIE_CQ_META_LBE),
 
                 -- TODO: connect this for Intel FPGA
                 IN_INTEL_META => (others => '0')
@@ -213,46 +237,57 @@ begin
     -- =============================================================================================
     -- creates mask for pcie addr based on the BAR APERTURE value in the PCIE header
     -- =============================================================================================
-    addr_mask_gen_p : process (all)
-        variable mask_var : std_logic_vector(63 downto 0);
-    begin
-        mask_var := (others => '0');
-        for i in 0 to 63 loop
-            if (i < unsigned(pcie_hdr_bar_aperture)) then
-                mask_var(i) := '1';
-            end if;
-        end loop;
-        pcie_addr_mask <= mask_var;
-    end process;
+    addr_mask_gen_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        addr_mask_gen_p : process (all)
+            variable mask_var : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
+        begin
+            mask_var(i) := (others => '0');
+            for j in 0 to 63 loop
+                if (j < unsigned(pcie_hdr_bar_aperture(i))) then
+                    mask_var(i)(j) := '1';
+                end if;
+            end loop;
+            pcie_addr_mask(i) <= mask_var(i);
+        end process;
 
-    pcie_addr_masked <= pcie_hdr_addr and pcie_addr_mask;
+        pcie_addr_masked(i) <= pcie_hdr_addr(i) and pcie_addr_mask(i);
+    end generate;
 
     -- =============================================================================================
     -- Controling split to different channels according to the current PCIe address
     -- =============================================================================================
-    channel_select_p : process (all) is
-    begin
-        is_dma_hdr   <= '0';
-        chan_num_int <= (others => '0');
 
-        if (PCIE_MFB_SOF = "1" and PCIE_MFB_SRC_RDY = '1') then
-            -- Base address of the first DMA header buffer is always larger by one than the last
-            -- addres for a data buffer in a last channel
-            is_dma_hdr <= pcie_addr_masked(log2(CHANNELS) + POINTER_WIDTH + 1);
+    channel_select_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        channel_select_p : process (all) is
+        begin
+            is_dma_hdr(i)   <= '0';
+            chan_num_int(i) <= (others => '0');
 
-            -- select only the part of the address which indexes DMA channels
-            chan_num_int <= pcie_addr_masked(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
-        end if;
-    end process;
+            -- NOTE: does not fully work because a different BAR ID has to drop the transaction
+            if PCIE_MFB_SRC_RDY = '1' then 
+                if PCIE_MFB_SOF(i) = '1' then
+                    -- Base address of the first DMA header buffer is always larger by one than the last
+                    -- addres for a data buffer in a last channel
+                    is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1);
 
-    byte_en_decoder_i : entity work.PCIE_BYTE_EN_DECODER
-        port map (
-            FBE_IN  => pcie_hdr_fbe,
-            LBE_IN  => pcie_hdr_lbe,
-            FBE_OUT => fbe_decoded,
-            LBE_OUT => lbe_decoded);
+                    -- select only the part of the address which indexes DMA channels
+                    chan_num_int(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                end if;
+            end if;
+        end process;
+    end generate;
 
-    pcie_mfb_meta_int <= pcie_tr_byte_cnt & lbe_decoded & fbe_decoded & (MFB_LENGTH/8 -1 downto 0 => '0') & chan_num_int & pcie_addr_masked(63 downto 2) & is_dma_hdr;
+    byte_en_decoder_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        byte_en_decoder_i : entity work.PCIE_BYTE_EN_DECODER
+            port map (
+                FBE_IN  => pcie_hdr_fbe(i),
+                LBE_IN  => pcie_hdr_lbe(i),
+                FBE_OUT => fbe_decoded(i),
+                LBE_OUT => lbe_decoded(i)
+            );
+
+        pcie_mfb_meta_int(i) <= pcie_tr_byte_cnt(i) & lbe_decoded(i) & fbe_decoded(i) & (MFB_LENGTH/8 -1 downto 0 => '0') & chan_num_int(i) & pcie_addr_masked(i)(63 downto 2) & is_dma_hdr(i);
+    end generate;
 
     pcie_hdr_cutter_i : entity work.MFB_CUTTER_SIMPLE
         generic map (
@@ -263,13 +298,14 @@ begin
             META_WIDTH     => META_BYTE_CNT_O + META_BYTE_CNT_W,
             META_ALIGNMENT => 0,
             -- 4 because the PCIe header is 4 DW long
-            CUTTED_ITEMS   => 4)
+            CUTTED_ITEMS   => 4
+        )
         port map (
             CLK   => CLK,
             RESET => RESET,
 
             RX_DATA    => PCIE_MFB_DATA,
-            RX_META    => pcie_mfb_meta_int,
+            RX_META    => slv_array_ser(pcie_mfb_meta_int),
             RX_SOF     => PCIE_MFB_SOF,
             RX_EOF     => PCIE_MFB_EOF,
             RX_SOF_POS => PCIE_MFB_SOF_POS,
@@ -285,7 +321,8 @@ begin
             TX_SOF_POS => cutt_mfb_sof_pos,
             TX_EOF_POS => cutt_mfb_eof_pos,
             TX_SRC_RDY => cutt_mfb_src_rdy,
-            TX_DST_RDY => cutt_mfb_dst_rdy);
+            TX_DST_RDY => cutt_mfb_dst_rdy
+        );
 
     mfb_auxiliary_signals_i : entity work.MFB_AUXILIARY_SIGNALS
         generic map (
@@ -296,7 +333,8 @@ begin
             META_WIDTH    => META_BYTE_CNT_O + META_BYTE_CNT_W,
             REGION_AUX_EN => FALSE,
             BLOCK_AUX_EN  => FALSE,
-            ITEM_AUX_EN   => TRUE)
+            ITEM_AUX_EN   => TRUE
+        )
         port map (
             CLK   => CLK,
             RESET => RESET,
@@ -322,58 +360,72 @@ begin
             TX_REGION_SHARED => open,
             TX_REGION_VLD    => open,
             TX_BLOCK_VLD     => open,
-            TX_ITEM_VLD      => mfb_aux_item_vld_int);
+            TX_ITEM_VLD      => mfb_aux_item_vld_int
+        );
 
     -- This quasi state machine stores the LBE value till the end of a packet
-    -- TODO: For more regions, this has to be multiplied
-    lbe_reg_p : process (CLK) is
-    begin
-        if (rising_edge(CLK)) then
-            if (RESET = '1') then
-                usr_mfb_lbe_pst <= (others => '0');
-            else
-                usr_mfb_lbe_pst <= usr_mfb_lbe_nst;
+    aux_mfb_meta_arr    <= slv_array_deser(aux_mfb_meta, PCIE_MFB_REGIONS);
+    lbe_fsm_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        lbe_reg_p : process (CLK) is
+        begin
+            if (rising_edge(CLK)) then
+                if (RESET = '1') then
+                    usr_mfb_lbe_pst(i) <= (others => '0');
+                else
+                    usr_mfb_lbe_pst(i) <= usr_mfb_lbe_nst(i);
+                end if;
             end if;
-        end if;
-    end process;
+        end process;
 
-    lbe_nst_logic_p : process (all) is
-    begin
-        usr_mfb_lbe_nst <= usr_mfb_lbe_pst;
+        lbe_nst_logic_p : process (all) is
+        begin
+            usr_mfb_lbe_nst(i) <= usr_mfb_lbe_pst(i);
 
-        if (aux_mfb_sof = "1" and aux_mfb_eof = "0") then
-            usr_mfb_lbe_nst <= aux_mfb_meta(META_LBE);
-        end if;
-    end process;
+            if (aux_mfb_sof(i) = '1' and aux_mfb_eof(i) = '1') then
+                usr_mfb_lbe_nst(i) <= aux_mfb_meta_arr(i)(META_LBE);
+            end if;
+        end process;
+    end generate;
 
     -- this process creates a byte enable for a whole MFB word
-    be_fill_p : process (all) is
-    begin
-        -- default assignment is to simply copy the validity value of the current item
-        for i in 0 to (PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1) loop
-            mfb_aux_item_be(i) <= (others => mfb_aux_item_vld_int(i));
-        end loop;
+    mfb_aux_item_vld_int_arr    <= slv_array_deser(mfb_aux_item_vld_int, PCIE_MFB_REGIONS);
+    aux_mfb_eof_pos_arr         <= slv_array_deser(aux_mfb_eof_pos, PCIE_MFB_REGIONS);
+    be_fill_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        be_fill_p : process (all) is
+        begin
+            -- default assignment is to simply copy the validity value of the current item
+            for j in 0 to (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1) loop
+                mfb_aux_item_be(i)(j) <= (others => mfb_aux_item_vld_int_arr(i)(j));
+            end loop;
 
-        if (aux_mfb_src_rdy = '1') then
-            -- apply FBE to the BE vector
-            if (aux_mfb_sof = "1") then
-                mfb_aux_item_be(0) <= aux_mfb_meta(META_FBE);
+            if (aux_mfb_src_rdy = '1') then
+                -- apply FBE to the BE vector
+                if (aux_mfb_sof(i) = '1') then
+                    mfb_aux_item_be(i)(0) <= aux_mfb_meta_arr(i)(META_FBE);
+                end if;
+
+                -- apply LBE to the BE vector
+                if (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '1') then
+                    mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= usr_mfb_lbe_pst(i);
+                elsif (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '1' and unsigned(aux_mfb_eof_pos_arr(i)) > 0) then
+                    mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= aux_mfb_meta_arr(i)(META_LBE);
+                end if;
             end if;
+        end process;
+    end generate;
 
-            -- apply LBE to the BE vector
-            if (aux_mfb_eof = "1" and aux_mfb_sof = "0") then
-                mfb_aux_item_be(to_integer(unsigned(aux_mfb_eof_pos))) <= usr_mfb_lbe_pst;
-            elsif (aux_mfb_eof = "1" and aux_mfb_sof = "1" and unsigned(aux_mfb_eof_pos) > 0) then
-                mfb_aux_item_be(to_integer(unsigned(aux_mfb_eof_pos))) <= aux_mfb_meta(META_LBE);
-            end if;
-        end if;
-    end process;
+    usr_mfb_meta_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        usr_mfb_meta_is_dma_hdr_arr(i)     <= aux_mfb_meta_arr(i)(META_IS_DMA_HDR);
+        usr_mfb_meta_is_dma_hdr_1d_arr(i)  <= usr_mfb_meta_is_dma_hdr_arr(i)(0);
+        usr_mfb_meta_pcie_addr_arr(i)      <= aux_mfb_meta_arr(i)(META_PCIE_ADDR);
+        usr_mfb_meta_chan_num_arr(i)       <= aux_mfb_meta_arr(i)(META_CHAN_NUM);
+    end generate;
 
-    USR_MFB_META_IS_DMA_HDR <= aux_mfb_meta(META_IS_DMA_HDR)(0);
-    USR_MFB_META_PCIE_ADDR  <= aux_mfb_meta(META_PCIE_ADDR);
-    USR_MFB_META_CHAN_NUM   <= aux_mfb_meta(META_CHAN_NUM);
-    USR_MFB_META_BYTE_EN    <= slv_array_ser(mfb_aux_item_be);
-    USR_MFB_META_BYTE_CNT   <= aux_mfb_meta(META_BYTE_CNT);
+    USR_MFB_META_IS_DMA_HDR <= usr_mfb_meta_is_dma_hdr_1d_arr;
+    USR_MFB_META_PCIE_ADDR  <= slv_array_ser(usr_mfb_meta_pcie_addr_arr);
+    USR_MFB_META_CHAN_NUM   <= slv_array_ser(usr_mfb_meta_chan_num_arr);
+    USR_MFB_META_BYTE_EN    <= slv_array_2d_ser(mfb_aux_item_be);
+    USR_MFB_META_BYTE_CNT   <= slv_array_ser(aux_mfb_meta(META_BYTE_CNT));
 
     USR_MFB_DATA    <= aux_mfb_data;
     USR_MFB_SOF     <= aux_mfb_sof;
