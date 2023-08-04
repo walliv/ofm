@@ -160,8 +160,8 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal aux_mfb_src_rdy      : std_logic;
     signal aux_mfb_dst_rdy      : std_logic;
 
-    signal usr_mfb_lbe_pst : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_LBE_W -1 downto 0);
-    signal usr_mfb_lbe_nst : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_LBE_W -1 downto 0);
+    signal usr_mfb_lbe_reg  : std_logic_vector(META_LBE_W -1 downto 0);
+    signal usr_mfb_lbe_sel  : std_logic_vector(META_LBE_W -1 downto 0);
 
     -- indicates which items in a current word are valid
     signal mfb_aux_item_vld_int     : std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1 downto 0);
@@ -363,66 +363,69 @@ begin
             TX_ITEM_VLD      => mfb_aux_item_vld_int
         );
 
-    ------------------------------------------------------------------------------------
-    ---                                 DEBUG_NEEDED                                 ---
-    ------------------------------------------------------------------------------------
-
     -- This quasi state machine stores the LBE value till the end of a packet
     aux_mfb_meta_arr    <= slv_array_deser(aux_mfb_meta, PCIE_MFB_REGIONS);
-    lbe_fsm_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
-        lbe_reg_p : process (CLK) is
-        begin
-            if (rising_edge(CLK)) then
-                if (RESET = '1') then
-                    usr_mfb_lbe_pst(i) <= (others => '0');
-                else
-                    usr_mfb_lbe_pst(i) <= usr_mfb_lbe_nst(i);
-                end if;
+    lbe_reg_p: process(CLK) is
+    begin 
+        if rising_edge(CLK) then
+            if (RESET = '1') then 
+                usr_mfb_lbe_reg <= (others => '0');
+            else
+                -- Higher takes
+                for i in 0 to PCIE_MFB_REGIONS - 1 loop
+                    if (aux_mfb_sof(i) = '1' and aux_mfb_eof(i) = '0') then
+                        usr_mfb_lbe_reg <= aux_mfb_meta_arr(i)(META_LBE);
+                    end if;
+                end  loop;
             end if;
-        end process;
+        end if;
+    end process;
 
-        lbe_nst_logic_p : process (all) is
-        begin
-            usr_mfb_lbe_nst(i) <= usr_mfb_lbe_pst(i);
+    -- NOTE: TWO REGIONS ONLY
 
-            if (aux_mfb_sof(i) = '1' and aux_mfb_eof(i) = '0') then
-                usr_mfb_lbe_nst(i) <= aux_mfb_meta_arr(i)(META_LBE);
-            end if;
-        end process;
-    end generate;
+    -- Select process 
+    lbe_sel_p: process(all)
+    begin 
+        if aux_mfb_sof(0) = '1' then 
+            usr_mfb_lbe_sel <= aux_mfb_meta_arr(0)(META_LBE);
+        else 
+            usr_mfb_lbe_sel <= usr_mfb_lbe_reg;
+        end if;
+    end process;
 
     -- this process creates a byte enable for a whole MFB word
     mfb_aux_item_vld_int_arr    <= slv_array_deser(mfb_aux_item_vld_int, PCIE_MFB_REGIONS);
     aux_mfb_eof_pos_arr         <= slv_array_deser(aux_mfb_eof_pos, PCIE_MFB_REGIONS);
-    be_fill_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
-        be_fill_p : process (all) is
-        begin
-            -- default assignment is to simply copy the validity value of the current item
+    be_fill_p : process (all) is
+    begin
+        -- default assignment is to simply copy the validity value of the current item
+        for i in 0 to PCIE_MFB_REGIONS - 1 loop 
             for j in 0 to (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1) loop
                 mfb_aux_item_be(i)(j) <= (others => mfb_aux_item_vld_int_arr(i)(j));
             end loop;
+        end loop;
 
-            if (aux_mfb_src_rdy = '1') then
-                -- apply FBE to the BE vector
+        if (aux_mfb_src_rdy = '1') then
+            -- apply FBE to the BE vector
+            for i in 0 to PCIE_MFB_REGIONS - 1 loop 
                 if (aux_mfb_sof(i) = '1') then
                     mfb_aux_item_be(i)(0) <= aux_mfb_meta_arr(i)(META_FBE);
                 end if;
 
                 -- apply LBE to the BE vector
                 if (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '0') then
-                    mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= usr_mfb_lbe_pst(i);
+                    mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= usr_mfb_lbe_sel;
                 elsif (aux_mfb_eof(i) = '1' and aux_mfb_sof(i) = '1' and unsigned(aux_mfb_eof_pos_arr(i)) > 0) then
                     mfb_aux_item_be(i)(to_integer(unsigned(aux_mfb_eof_pos_arr(i)))) <= aux_mfb_meta_arr(i)(META_LBE);
                 end if;
-            end if;
-        end process;
-    end generate;
-    ------------------------------------------------------------------------------------
-    ---                                 DEBUG_NEEDED                                 ---
-    ------------------------------------------------------------------------------------
+            end loop;
+        end if;
+    end process;
+
     usr_mfb_meta_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
         usr_mfb_meta_is_dma_hdr_arr(i)     <= aux_mfb_meta_arr(i)(META_IS_DMA_HDR);
         usr_mfb_meta_is_dma_hdr_1d_arr(i)  <= usr_mfb_meta_is_dma_hdr_arr(i)(0);
+
         usr_mfb_meta_pcie_addr_arr(i)      <= aux_mfb_meta_arr(i)(META_PCIE_ADDR);
         usr_mfb_meta_chan_num_arr(i)       <= aux_mfb_meta_arr(i)(META_CHAN_NUM);
     end generate;
