@@ -120,11 +120,11 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     constant META_BE_O         : natural := META_CHAN_NUM_O + META_CHAN_NUM_W;
     constant META_BYTE_CNT_O   : natural := META_BE_O + META_BE_W;
 
-    subtype META_IS_DMA_HDR is natural range META_IS_DMA_HDR_O + META_IS_DMA_HDR_W -1 downto META_IS_DMA_HDR_O;
-    subtype META_PCIE_ADDR is natural range META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
-    subtype META_CHAN_NUM is natural range META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
-    subtype META_BE is natural range META_BE_O + META_BE_W -1 downto META_BE_O;
-    subtype META_BYTE_CNT is natural range META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto META_BYTE_CNT_O;
+    subtype META_IS_DMA_HDR   is natural range META_IS_DMA_HDR_O + META_IS_DMA_HDR_W -1 downto META_IS_DMA_HDR_O;
+    subtype META_PCIE_ADDR    is natural range   META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
+    subtype META_CHAN_NUM     is natural range     META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
+    subtype META_BE           is natural range                 META_BE_O + META_BE_W -1 downto META_BE_O;
+    subtype META_BYTE_CNT     is natural range     META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto META_BYTE_CNT_O;
 
     -- =============================================================================================
     -- State machines' states
@@ -133,6 +133,7 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     type all_chan_active_states_t is array (CHANNELS -1 downto 0) of channel_active_state_t;
     signal channel_active_pst : all_chan_active_states_t := (others => CHANNEL_STOPPED);
     signal channel_active_nst : all_chan_active_states_t := (others => CHANNEL_STOPPED);
+
     -- MUX inputs to acknowledge start/stop from each channel
     signal chan_start_req_ack : std_logic_vector(CHANNELS -1 downto 0);
     signal chan_stop_req_ack  : std_logic_vector(CHANNELS -1 downto 0);
@@ -141,8 +142,10 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     type all_chan_pkt_acc_state_t is array (CHANNELS -1 downto 0) of pkt_acc_state_t;
     signal pkt_acc_pst      : all_chan_pkt_acc_state_t := (others => S_IDLE);
     signal pkt_acc_nst      : all_chan_pkt_acc_state_t := (others => S_IDLE);
-    -- drop enable for each channel
+
+    -- Drop enable for each channel
     signal chan_pkt_drop_en : slv_array_t(CHANNELS -1 downto 0)(PCIE_MFB_REGIONS -1 downto 0);
+
     -- MUXed from all channels
     signal pkt_drop_en      : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
 

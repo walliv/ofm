@@ -20,7 +20,7 @@ use work.pcie_meta_pack.all;
 -- output are chosen according their usefullness later in the design.
 entity TX_DMA_METADATA_EXTRACTOR is
     generic (
-        DEVICE : string := "STRATIX10";
+        DEVICE : string := "ULTRASCALE";
 
         -- For generating outputs and calculating the DMA buffers address space
         CHANNELS       : natural := 8;
