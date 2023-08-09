@@ -276,8 +276,13 @@ begin
             if PCIE_MFB_SRC_RDY = '1' then 
                 if PCIE_MFB_SOF(i) = '1' then
                     -- Base address of the first DMA header buffer is always larger by one than the last
+<<<<<<< HEAD
                     -- addres for a data buffer in a last channel
                     is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1);
+=======
+                    -- address for a data buffer in a last channel
+                    is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH);
+>>>>>>> f4ec84d0 (tx_dma_calypte [WIP]: Backup - add support for second region in channel control)
 
                     -- select only the part of the address which indexes DMA channels
                     chan_num_int(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);

@@ -25,7 +25,7 @@ use work.dma_hdr_pkg.all;
 -- .. NOTE::
 --    A frame can consist out of multiple smaller frames that are delimited by the DMA header.
 --
-entity TX_DMA_CHAN_START_STOP_CTRL is
+entity 0 is
     generic (
         DEVICE : string := "ULTRASCALE";
 
@@ -189,6 +189,20 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- attribute mark_debug of stop_req_while_pending_ored : signal is "true";
 
     -- attribute mark_debug of ST_SP_DBG_META : signal is "true";
+    -- ========================
+    -- David's playground
+    -- ========================
+    -- Enable signal for 'second' FSM machines
+    signal channel_en_arr       : std_logic_vector(CHANNELS - 1 downto 0);
+
+    -- This signal is telling us, when the State should change
+    signal is_dma_hdr_arr       : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
+
+    -- Divide meta signal for better usage
+    signal pcie_mfb_meta_arr    : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+
+    -- Drop Suggest - The real drop is carried out by FSM
+    signal pcie_mfb_drop_arr    : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
 begin
 
     stop_req_while_pending_ored <= or stop_req_while_pending;
@@ -252,96 +266,190 @@ begin
     STOP_REQ_ACK  <= chan_stop_req_ack(to_integer(unsigned(STOP_REQ_CHAN)));
 
     -- =============================================================================================
+    -- Channel Select
+    -- =============================================================================================
+    -- This process creates a channel enable signal for multiple regions
+    -- This process sets several (2) state machines in motion at the same time
+
+    -- For combination: SOF(0) SOF(1) HDR(0) HDR(1)
+    --                   1      1      1      0
+    -- the last assignment gives me is_dma_hdr_arr(Channel) <= '0'
+    -- but the PCIE_MFB_META(META_IS_DMA_HDR)(0) should be 1
+
+    -- Possibilities: SOF(0) SOF(1) HDR(0) HDR(1)  Possible Channels
+    -- 1)              0      0      0      0            1 Channel
+    -- 2)              0      1      0      0            1 Channel
+    -- 3)              0      1      0      1            1 Channel
+    -- 4)              1      0      0      0            1 Channel
+    -- 5)              1      0      1      0            1 Channel
+    -- 6)              1      1      0      0      up to 2 Channels
+    -- 7)              1      1      0      1      up to 2 Channels
+    -- 8)              1      1      1      0      up to 2 Channels
+    -- 9)              1      1      1      1            2 Channels
+
+    -- The pcie_mfb_drop_arr creates a drop suggestion in the current channel
+    -- This is because it may discard data from other channels
+
+    pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
+    channel_sel_p: process(all)
+    begin
+        channel_en_arr      <= (others => '0');
+        is_dma_hdr_arr      <= (others => (others => '0'));
+        pcie_mfb_drop_arr   <= (others => (others => '0'));
+
+        -- Last assignment
+        for i in 0 to PCIE_MFB_REGIONS - 1 loop
+            if PCIE_MFB_SOF(i) = '1' then
+                channel_en_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))       <= '1';
+                is_dma_hdr_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i)    <= pcie_mfb_meta_arr(i)(META_IS_DMA_HDR)(0);
+                pcie_mfb_drop_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i) <= '1';
+            end if;
+        end loop;
+    end process;
+
+    -- =============================================================================================
     -- Status of a packet processing on all channels
     --
     -- The PKT_PENDING means there are still incoming PCIe transactions for the current packet.
     -- =============================================================================================
-    acceptor_fsm_g : for j in (CHANNELS -1) downto 0 generate
-        pkt_acceptor_state_reg_p : process (CLK) is
-        begin
-            if (rising_edge(CLK)) then
-                if (RESET = '1') then
-                    pkt_acc_pst(j)        <= S_IDLE;
-                    tr_byte_lng_stored(j) <= (others => '0');
-                elsif (PCIE_MFB_DST_RDY = '1') then
-                    pkt_acc_pst(j)        <= pkt_acc_nst(j);
-                    tr_byte_lng_stored(j) <= tr_byte_lng_curr(j);
-                end if;
-            end if;
-        end process;
-
-        pkt_acceptor_nst_logic_p : process (all) is
-        begin
-            pkt_acc_nst(j)      <= pkt_acc_pst(j);
-            tr_byte_lng_curr(j) <= tr_byte_lng_stored(j);
-
-            chan_pkt_drop_en(j)        <= (others => '0');
-            dma_frame_lng_correct(j)   <= '0';
-            dma_frame_lng_incorrect(j) <= '0';
-
-            case pkt_acc_pst(j) is
-                when S_IDLE =>
-                    if (
-                        PCIE_MFB_SRC_RDY = '1'
-                        and PCIE_MFB_SOF = "1"
-                        and PCIE_MFB_META(META_IS_DMA_HDR) = "0"
-                        and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
-                        ) then
-
-                        if (channel_active_pst(j) = CHANNEL_RUNNING) then
-                            pkt_acc_nst(j)      <= S_PKT_PENDING;
-                            tr_byte_lng_curr(j) <= resize(unsigned(PCIE_MFB_META(META_BYTE_CNT)), log2(PKT_SIZE_MAX+1));
-                        else
-                            pkt_acc_nst(j)      <= S_PKT_DROP;
-                            chan_pkt_drop_en(j) <= (others => '1');
-                        end if;
+    pkt_region_acc_g: if PCIE_MFB_REGIONS = 1 generate
+        acceptor_fsm_g : for j in (CHANNELS -1) downto 0 generate
+            pkt_acceptor_state_reg_p : process (CLK) is
+            begin
+                if (rising_edge(CLK)) then
+                    if (RESET = '1') then
+                        pkt_acc_pst(j)        <= S_IDLE;
+                        tr_byte_lng_stored(j) <= (others => '0');
+                    else
+                        pkt_acc_pst(j) <= pkt_acc_nst(j);
+                        tr_byte_lng_stored(j) <= tr_byte_lng_curr(j);
                     end if;
+                end if;
+            end process;
 
-                when S_PKT_PENDING =>
-                    if (PCIE_MFB_SRC_RDY = '1'
-                        and PCIE_MFB_SOF = "1"
-                        and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
-                        ) then
+            pkt_acceptor_nst_logic_p : process (all) is
+            begin
+                pkt_acc_nst(j)      <= pkt_acc_pst(j);
+                tr_byte_lng_curr(j) <= tr_byte_lng_stored(j);
 
-                        if (PCIE_MFB_META(META_IS_DMA_HDR) = "1") then
+                chan_pkt_drop_en(j) <= (others => '0');
+                dma_frame_lng_correct(j)   <= '0';
+                dma_frame_lng_incorrect(j) <= '0';    
 
-                            pkt_acc_nst(j) <= S_IDLE;
+                case pkt_acc_pst(j) is
+                    when S_IDLE =>
+                        if (
+                            PCIE_MFB_SRC_RDY = '1'
+                            and PCIE_MFB_SOF = "1"
+                            and PCIE_MFB_META(META_IS_DMA_HDR) = "0"
+                            and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
+                            ) then
 
-                            if (tr_byte_lng_stored(j) = unsigned(PCIE_MFB_DATA(DMA_FRAME_LENGTH))) then
-                                dma_frame_lng_correct(j) <= '1';
+                            if (channel_active_pst(j) = CHANNEL_RUNNING) then
+                                pkt_acc_nst(j) <= S_PKT_PENDING;
+                                tr_byte_lng_curr(j) <= resize(unsigned(PCIE_MFB_META(META_BYTE_CNT)), log2(PKT_SIZE_MAX+1));
                             else
-                                dma_frame_lng_incorrect(j) <= '1';
+                                pkt_acc_nst(j)      <= S_PKT_DROP;
+                                chan_pkt_drop_en(j) <= (others => '1');
+                            end if;
+                        end if;
+
+                    when S_PKT_PENDING =>
+                        if (PCIE_MFB_SRC_RDY = '1'
+                            and PCIE_MFB_SOF = "1"
+                            and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
+                            ) then
+
+                            if (PCIE_MFB_META(META_IS_DMA_HDR) = "1") then
+
+                                pkt_acc_nst(j) <= S_IDLE;
+
+                                if (tr_byte_lng_stored(j) = unsigned(PCIE_MFB_DATA(DMA_FRAME_LENGTH))) then
+                                    dma_frame_lng_correct(j) <= '1';
+                                else
+                                    dma_frame_lng_incorrect(j) <= '1';
+                                end if;
+
+                            elsif (PCIE_MFB_META(META_IS_DMA_HDR) = "0") then
+                                tr_byte_lng_curr(j) <= tr_byte_lng_stored(j) + resize(unsigned(PCIE_MFB_META(META_BYTE_CNT)), log2(PKT_SIZE_MAX+1));
+                            end if;
+                        end if;
+    
+                    when S_PKT_DROP =>
+                        if (PCIE_MFB_SRC_RDY = '1'
+                            and PCIE_MFB_SOF = "1"
+                            and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)) then
+                            chan_pkt_drop_en(j) <= (others => '1');
+
+                            if (PCIE_MFB_META(META_IS_DMA_HDR) = "1") then
+                                pkt_acc_nst(j) <= S_IDLE;
+                            end if;
+                        end if;
+                end case;
+            end process;
+
+            dma_hdr_out_of_order_chan(j) <= '1' when (
+                pkt_acc_pst(j) = S_IDLE
+                and PCIE_MFB_SRC_RDY = '1'
+                and PCIE_MFB_DST_RDY = '1'
+                and PCIE_MFB_SOF = "1"
+                and PCIE_MFB_META(META_IS_DMA_HDR) = "1"
+                and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
+                ) else '0';
+
+        end generate;
+    else generate 
+        -- Two regions
+        acceptor_fsm_g : for j in (CHANNELS -1) downto 0 generate
+            pkt_acceptor_state_reg_p : process (CLK) is
+            begin
+                if (rising_edge(CLK)) then
+                    if (RESET = '1') then
+                        pkt_acc_pst(j) <= S_IDLE;
+                    else
+                        pkt_acc_pst(j) <= pkt_acc_nst(j);
+                    end if;
+                end if;
+            end process;
+
+            pkt_acceptor_nst_logic_p : process (all) is
+            begin
+                pkt_acc_nst(j)      <= pkt_acc_pst(j);
+                chan_pkt_drop_en(j) <= (others => '0');
+
+                case pkt_acc_pst(j) is
+                    -- This process is looking for SOF so that it can move to another state
+                    -- The state it moves to is based on channel activity
+                    when S_IDLE         =>
+                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
+
+                            -- 2) 4) 6)
+                            if (channel_active_pst(j) = CHANNEL_RUNNING) then
+                                pkt_acc_nst(j) <= S_PKT_PENDING;
+                            else
+                                pkt_acc_nst(j)      <= S_PKT_DROP;
+                                chan_pkt_drop_en(j) <= pcie_mfb_drop_arr(j);
                             end if;
 
-                        elsif (PCIE_MFB_META(META_IS_DMA_HDR) = "0") then
-                            tr_byte_lng_curr(j) <= tr_byte_lng_stored(j) + resize(unsigned(PCIE_MFB_META(META_BYTE_CNT)), log2(PKT_SIZE_MAX+1));
+                            -- One transaction in on MFB word
+                            -- Possible discard is handled in previous condition
+                            -- 7)
+                            if (is_dma_hdr_arr(j)(1) = '1') then
+                                pkt_acc_nst(j)      <= S_IDLE;
+                            end if;
                         end if;
-                    end if;
 
-                when S_PKT_DROP =>
-                    if (PCIE_MFB_SRC_RDY = '1'
-                        and PCIE_MFB_SOF = "1"
-                        and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
-                        ) then
+                    when S_PKT_PENDING  =>
+                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
 
-                        chan_pkt_drop_en(j) <= (others => '1');
-
-                        if (PCIE_MFB_META(META_IS_DMA_HDR) = "1") then
-                            pkt_acc_nst(j) <= S_IDLE;
                         end if;
-                    end if;
-            end case;
-        end process;
+                    when S_PKT_DROP     =>
+                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
 
-        dma_hdr_out_of_order_chan(j) <= '1' when (
-            pkt_acc_pst(j) = S_IDLE
-            and PCIE_MFB_SRC_RDY = '1'
-            and PCIE_MFB_DST_RDY = '1'
-            and PCIE_MFB_SOF = "1"
-            and PCIE_MFB_META(META_IS_DMA_HDR) = "1"
-            and std_logic_vector(to_unsigned(j, log2(CHANNELS))) = PCIE_MFB_META(META_CHAN_NUM)
-            ) else '0';
-
+                        end if;
+                end case;
+            end process;
+        end generate;
     end generate;
 
     ST_SP_DBG_CHAN    <= PCIE_MFB_META(META_CHAN_NUM);
@@ -397,5 +505,7 @@ begin
             TX_SOF     => USR_MFB_SOF,
             TX_EOF     => USR_MFB_EOF,
             TX_SRC_RDY => USR_MFB_SRC_RDY,
-            TX_DST_RDY => USR_MFB_DST_RDY);
+            TX_DST_RDY => USR_MFB_DST_RDY
+        );
+
 end architecture;
