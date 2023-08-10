@@ -25,7 +25,7 @@ use work.dma_hdr_pkg.all;
 -- .. NOTE::
 --    A frame can consist out of multiple smaller frames that are delimited by the DMA header.
 --
-entity 0 is
+entity TX_DMA_CHAN_START_STOP_CTRL is
     generic (
         DEVICE : string := "ULTRASCALE";
 
@@ -35,7 +35,7 @@ entity 0 is
         -- =========================================================================================
         -- Input PCIe interface parameters
         -- =========================================================================================
-        PCIE_MFB_REGIONS     : natural := 1;
+        PCIE_MFB_REGIONS     : natural := 2;
         PCIE_MFB_REGION_SIZE : natural := 1;
         PCIE_MFB_BLOCK_SIZE  : natural := 8;
         PCIE_MFB_ITEM_WIDTH  : natural := 32;
@@ -56,7 +56,7 @@ entity 0 is
         -- Input PCIe MFB interface
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH-1 downto 0);
-        PCIE_MFB_META    : in  std_logic_vector(13 + (PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+        PCIE_MFB_META    : in  std_logic_vector(PCIE_MFB_REGIONS*(13 + (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         PCIE_MFB_SOF_POS : in  std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
@@ -68,7 +68,7 @@ entity 0 is
         -- Output MFB interface
         -- =========================================================================================
         USR_MFB_DATA    : out std_logic_vector(PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH-1 downto 0);
-        USR_MFB_META    : out std_logic_vector((PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+        USR_MFB_META    : out std_logic_vector(PCIE_MFB_REGIONS*((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         USR_MFB_SOF     : out std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         USR_MFB_EOF     : out std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
         USR_MFB_SOF_POS : out std_logic_vector(PCIE_MFB_REGIONS*max(1, log2(PCIE_MFB_REGION_SIZE)) -1 downto 0);
@@ -111,7 +111,7 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     constant META_IS_DMA_HDR_W : natural := 1;
     constant META_PCIE_ADDR_W  : natural := 62;
     constant META_CHAN_NUM_W   : natural := log2(CHANNELS);
-    constant META_BE_W         : natural := MFB_LENGTH/8;
+    constant META_BE_W         : natural := (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8;
     constant META_BYTE_CNT_W   : natural := 13;
 
     constant META_IS_DMA_HDR_O : natural := 0;
@@ -192,17 +192,14 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- ========================
     -- David's playground
     -- ========================
-    -- Enable signal for 'second' FSM machines
-    signal channel_en_arr       : std_logic_vector(CHANNELS - 1 downto 0);
-
     -- This signal is telling us, when the State should change
     signal is_dma_hdr_arr       : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
 
     -- Divide meta signal for better usage
     signal pcie_mfb_meta_arr    : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
 
-    -- Drop Suggest - The real drop is carried out by FSM
-    signal pcie_mfb_drop_arr    : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
+    -- SOF for specific channel - painfull I know
+    signal pcie_mfb_sof_arr     : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
 begin
 
     stop_req_while_pending_ored <= or stop_req_while_pending;
@@ -293,16 +290,14 @@ begin
     pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
     channel_sel_p: process(all)
     begin
-        channel_en_arr      <= (others => '0');
         is_dma_hdr_arr      <= (others => (others => '0'));
-        pcie_mfb_drop_arr   <= (others => (others => '0'));
+        pcie_mfb_sof_arr    <= (others => (others => '0'));
 
         -- Last assignment
         for i in 0 to PCIE_MFB_REGIONS - 1 loop
             if PCIE_MFB_SOF(i) = '1' then
-                channel_en_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))       <= '1';
+                pcie_mfb_sof_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i)  <= '1';
                 is_dma_hdr_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i)    <= pcie_mfb_meta_arr(i)(META_IS_DMA_HDR)(0);
-                pcie_mfb_drop_arr(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i) <= '1';
             end if;
         end loop;
     end process;
@@ -421,31 +416,81 @@ begin
                     -- This process is looking for SOF so that it can move to another state
                     -- The state it moves to is based on channel activity
                     when S_IDLE         =>
-                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
+                        if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
 
                             -- 2) 4) 6)
                             if (channel_active_pst(j) = CHANNEL_RUNNING) then
-                                pkt_acc_nst(j) <= S_PKT_PENDING;
+                                pkt_acc_nst(j)      <= S_PKT_PENDING;
                             else
                                 pkt_acc_nst(j)      <= S_PKT_DROP;
-                                chan_pkt_drop_en(j) <= pcie_mfb_drop_arr(j);
+                                chan_pkt_drop_en(j) <= pcie_mfb_sof_arr(j);
                             end if;
 
+                            -- 7)
                             -- One transaction in on MFB word
                             -- Possible discard is handled in previous condition
-                            -- 7)
+                            -- Very specific - This assumes that SOF was present in first region aswell
+                            --               - In no other case does the DMA header appear.
                             if (is_dma_hdr_arr(j)(1) = '1') then
                                 pkt_acc_nst(j)      <= S_IDLE;
                             end if;
                         end if;
 
+                    -- This process is looking for DMA header so it can move to S_IDLE
+                    -- But there's a catch - There could be combination 8) 
+                    -- Then we move to S_PKT_PENDING or S_PKT_DROP based on channel activity
                     when S_PKT_PENDING  =>
-                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
+                        if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
 
+                            -- 8)
+                            -- DMA header is in the first region - we must check if there's start of new transaction
+                            if (is_dma_hdr_arr(j)(0) = '1') then
+                                if (pcie_mfb_sof_arr(j)(1) = '1') then
+                                    if (channel_active_pst(j) = CHANNEL_RUNNING) then
+                                        pkt_acc_nst(j) <= S_PKT_PENDING;
+                                    else
+                                        pkt_acc_nst(j)          <= S_PKT_DROP;
+                                        chan_pkt_drop_en(j)(1)  <= '1';
+                                    end if;
+                                else
+                                    -- 5)
+                                    pkt_acc_nst(j)      <= S_IDLE;
+                                end if;
+                            end if;
+
+                            -- 3) 7) 9)
+                            -- DMA header is in the second region - always move to S_IDLE
+                            if (is_dma_hdr_arr(j)(1) = '1') then
+                                pkt_acc_nst(j)      <= S_IDLE;
+                            end if;
                         end if;
-                    when S_PKT_DROP     =>
-                        if ((PCIE_MFB_SRC_RDY = '1') and (channel_en_arr(j) = '1')) then 
 
+                    when S_PKT_DROP     =>
+                        if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
+
+                            chan_pkt_drop_en(j) <= pcie_mfb_sof_arr(j);
+                            
+                            -- 8)
+                            -- DMA header is in the first region - we must check if there's start of new transaction
+                            if (is_dma_hdr_arr(j)(0) = '1') then
+                                if (pcie_mfb_sof_arr(j)(1) = '1') then
+                                    if (channel_active_pst(j) = CHANNEL_RUNNING) then
+                                        pkt_acc_nst(j)          <= S_PKT_PENDING;
+                                        chan_pkt_drop_en(j)(1)  <= '0';
+                                    else
+                                        pkt_acc_nst(j)          <= S_PKT_DROP;
+                                    end if;                                    
+                                else
+                                    -- 5)
+                                    pkt_acc_nst(j)      <= S_IDLE;
+                                end if;
+                            end if;
+
+                            -- 3) 7) 9)
+                            -- DMA header is in the second region - always move to S_IDLE
+                            if (is_dma_hdr_arr(j)(1) = '1') then
+                                pkt_acc_nst(j)      <= S_IDLE;
+                            end if;
                         end if;
                 end case;
             end process;
@@ -475,7 +520,7 @@ begin
     -- Meeting specific conditions regarding processing of a current packet and channel active
     -- status will cause every packet on the input to be dropped.
     -- =============================================================================================
-    pkt_drop_en <= chan_pkt_drop_en(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM))));
+    -- pkt_drop_en <= (or chan_pkt_drop_en --chan_pkt_drop_en(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM))));
 
     pkt_dropper_i : entity work.MFB_DROPPER
         generic map (
@@ -483,7 +528,8 @@ begin
             REGION_SIZE => PCIE_MFB_REGION_SIZE,
             BLOCK_SIZE  => PCIE_MFB_BLOCK_SIZE,
             ITEM_WIDTH  => PCIE_MFB_ITEM_WIDTH,
-            META_WIDTH  => PCIE_MFB_META'length - META_BYTE_CNT_W)
+            META_WIDTH  => ((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)  --PCIE_MFB_META'length
+        )
         port map (
             CLK   => CLK,
             RESET => RESET,
