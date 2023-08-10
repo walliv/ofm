@@ -149,6 +149,7 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- MUXed from all channels
     signal pkt_drop_en      : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
 
+<<<<<<< HEAD
     -- =============================================================================================
     -- All things debugging
     -- =============================================================================================
@@ -193,14 +194,32 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- David's playground
     -- ========================
     -- This signal is telling us, when the State should change
+=======
+    -- is_dma_hdr per region
+>>>>>>> 7c02ec17 (tx_dma_calypte [WIP]: Add support for two regions)
     signal is_dma_hdr_arr       : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
 
     -- Divide meta signal for better usage
     signal pcie_mfb_meta_arr    : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
 
-    -- SOF for specific channel - painfull I know
+    -- SOF for specific channel
     signal pcie_mfb_sof_arr     : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
+
+    -- Discard logic
+    signal pcie_mfb_data_arr            : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH - 1 downto 0);
+    signal pcie_mfb_disc_chan_arr       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(log2(CHANNELS) -1 downto 0);
+    signal pcie_mfb_disc_bytes_arr      : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(log2(PKT_SIZE_MAX+1) -1 downto 0);
+    signal pcie_mfb_disc_inc_arr        : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
+    signal fifox_mult_di                : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(log2(CHANNELS) + log2(PKT_SIZE_MAX+1) + 1 - 1 downto 0);
+    signal fifox_mult_do                : std_logic_vector(log2(CHANNELS) + log2(PKT_SIZE_MAX+1) + 1 - 1 downto 0);
+    signal fifox_mult_empty             : std_logic_vector(0 downto 0);
+
+    -- Verification 
+    signal fifox_mult_full              : std_logic;
+    signal fifo_full_reg                : std_logic;
+
 begin
+    assert (fifo_full_reg = '0') report "TX_DMA_CHAN_START_STOP_CTRL: FIFOX_MULTI OVERFLOW!" severity Failure;
 
     stop_req_while_pending_ored <= or stop_req_while_pending;
     meta_is_dma_hdr_int         <= PCIE_MFB_META(META_IS_DMA_HDR);
@@ -465,6 +484,9 @@ begin
                             end if;
                         end if;
 
+                    -- This process is looking for DMA header so it can move to S_IDLE
+                    -- But there's a catch - There could be combination 8) 
+                    -- Then we move to S_PKT_PENDING or S_PKT_DROP based on channel activity
                     when S_PKT_DROP     =>
                         if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
 
@@ -496,6 +518,7 @@ begin
             end process;
         end generate;
     end generate;
+<<<<<<< HEAD
 
     ST_SP_DBG_CHAN    <= PCIE_MFB_META(META_CHAN_NUM);
     ST_SP_DBG_META(0) <= (or dma_hdr_out_of_order_chan);
@@ -513,6 +536,73 @@ begin
                         and PCIE_MFB_SRC_RDY = '1'
                         and PCIE_MFB_DST_RDY = '1')
                     else '0';
+=======
+        
+    pcie_mfb_data_arr   <= slv_array_deser(PCIE_MFB_DATA, PCIE_MFB_REGIONS);
+    discard_arr_p: process(all)
+    begin
+        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+            pcie_mfb_disc_chan_arr(i)   <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
+            pcie_mfb_disc_bytes_arr(i)  <= pcie_mfb_data_arr(i)(log2(PKT_SIZE_MAX+1) -1 downto 0);
+
+            pcie_mfb_disc_inc_arr(i)    <= '0';
+            if (pkt_acc_pst(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) = S_PKT_DROP
+               and pcie_mfb_meta_arr(i)(META_IS_DMA_HDR)(0) = '1'
+               and PCIE_MFB_SRC_RDY = '1'
+               and PCIE_MFB_DST_RDY = '1') then
+                pcie_mfb_disc_inc_arr(i)   <= '1';
+            end if;
+
+        end loop;
+    end process;
+
+    var_conc_p: process(all)
+    begin 
+        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+            fifox_mult_di(i) <= pcie_mfb_disc_chan_arr(i) & pcie_mfb_disc_bytes_arr(i) & pcie_mfb_disc_inc_arr(i);
+        end loop;
+    end process;
+    
+    overflow_fifox_i: entity work.FIFOX_MULTI
+    generic map(
+        DATA_WIDTH      => log2(CHANNELS) + log2(PKT_SIZE_MAX+1) + 1,
+        ITEMS           => CHANNELS*2,
+        WRITE_PORTS     => PCIE_MFB_REGIONS,
+        READ_PORTS      => 1,
+        DEVICE          => DEVICE
+     )
+     port map (
+        CLK     => CLK,
+        RESET   => RESET,
+
+        DI      => slv_array_ser(fifox_mult_di),
+        WR      => pcie_mfb_disc_inc_arr,
+        FULL    => fifox_mult_full,
+        AFULL   => open,
+    
+        DO      => fifox_mult_do,
+        RD      => "1",
+        EMPTY   => fifox_mult_empty,
+        AEMPTY  => open
+    );
+
+    disc_out_p: process(all)
+    begin
+        if fifox_mult_empty = "0" then 
+            (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
+        else 
+            (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
+            PKT_DISC_INC    <= '0';
+        end if;
+    end process;
+
+    ver_reg_p: process(CLK)
+    begin
+        if rising_edge(CLK) then 
+            fifo_full_reg <= fifox_mult_full;
+        end if;
+    end process;
+>>>>>>> 7c02ec17 (tx_dma_calypte [WIP]: Add support for two regions)
 
     -- =============================================================================================
     -- Packet droping
@@ -520,7 +610,12 @@ begin
     -- Meeting specific conditions regarding processing of a current packet and channel active
     -- status will cause every packet on the input to be dropped.
     -- =============================================================================================
-    -- pkt_drop_en <= (or chan_pkt_drop_en --chan_pkt_drop_en(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM))));
+    drop_en_p: process(all)
+    begin
+        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+            pkt_drop_en(i)  <= chan_pkt_drop_en(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i);
+        end loop;
+    end process;
 
     pkt_dropper_i : entity work.MFB_DROPPER
         generic map (
