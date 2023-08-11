@@ -54,14 +54,14 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
 
         -- =========================================================================================
         -- Output reading interface
-        --
+        --  
         -- Similar to BRAM block.
         -- =========================================================================================
         RD_CHAN : in  std_logic_vector(log2(CHANNELS) -1 downto 0);
         RD_DATA : out std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
         RD_ADDR : in  std_logic_vector(POINTER_WIDTH -1 downto 0);
         RD_EN   : in  std_logic
-        );
+    );
 end entity;
 
 architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
@@ -83,29 +83,30 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     constant META_BE_O         : natural := META_CHAN_NUM_O + META_CHAN_NUM_W;
 
     subtype META_IS_DMA_HDR is natural range META_IS_DMA_HDR_O + META_IS_DMA_HDR_W -1 downto META_IS_DMA_HDR_O;
-    subtype META_PCIE_ADDR is natural range META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
-    subtype META_CHAN_NUM is natural range META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
-    subtype META_BE is natural range META_BE_O + META_BE_W -1 downto META_BE_O;
+    subtype META_PCIE_ADDR  is natural range   META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
+    subtype META_CHAN_NUM   is natural range     META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
+    subtype META_BE         is natural range                 META_BE_O + META_BE_W -1 downto META_BE_O;
 
     -- counter of the address for each valid word following the beginning of the transaction
-    signal addr_cntr_pst : unsigned(PCIE_MFB_META(META_PCIE_ADDR)'length -1 downto 0);
-    signal addr_cntr_nst : unsigned(PCIE_MFB_META(META_PCIE_ADDR)'length -1 downto 0);
+    signal addr_cntr_pst            : unsigned(PCIE_MFB_META(META_PCIE_ADDR)'length -1 downto 0);
+    signal addr_cntr_nst            : unsigned(PCIE_MFB_META(META_PCIE_ADDR)'length -1 downto 0);
 
     -- control of the amount of shift on the writing barrel shifters
-    signal wr_shift_sel : std_logic_vector(log2(MFB_LENGTH/32) -1 downto 0);
+    signal wr_shift_sel             : std_logic_vector(log2(MFB_LENGTH/32) -1 downto 0);
 
-    signal wr_be_bram_bshifter   : std_logic_vector((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_be_bram_demux      : slv_array_t(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_addr_bram_by_shift : slv_array_t((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
-    signal wr_data_bram_bshifter : std_logic_vector(MFB_LENGTH -1 downto 0);
+    signal wr_be_bram_bshifter      : std_logic_vector((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_be_bram_demux         : slv_array_t(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_data_bram_bshifter    : std_logic_vector(MFB_LENGTH -1 downto 0);
 
-    signal chan_num_pst : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal chan_num_nst : std_logic_vector(log2(CHANNELS) -1 downto 0);
+    signal chan_num_pst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
+    signal chan_num_nst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
 
-    signal rd_en_bram_demux   : std_logic_vector(CHANNELS -1 downto 0);
-    signal rd_data_bram_mux   : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal rd_data_bram       : slv_array_t(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
-    signal rd_addr_bram_by_shift : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal rd_en_bram_demux         : std_logic_vector(CHANNELS -1 downto 0);
+    signal rd_data_bram_mux         : std_logic_vector(MFB_LENGTH -1 downto 0);
+    signal rd_data_bram             : slv_array_t(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
+    signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+
 begin
 
     addr_cntr_reg_p : process (CLK) is
@@ -125,6 +126,10 @@ begin
 
         -- Increment the address for a next word by 8 (the number of DWs in the word) to be written
         -- to the BRAMs.
+        -- So you are incrementing up to the next region 
+
+        -- When the new packet arrives his address is saved and incremented by a region size
+        -- What about packet that fits into one region? - Interesting
         if (PCIE_MFB_SRC_RDY = '1') then
             if (PCIE_MFB_SOF = "1" and PCIE_MFB_EOF = "0") then
                 addr_cntr_nst <= unsigned(PCIE_MFB_META(META_PCIE_ADDR)) + 8;
@@ -134,9 +139,13 @@ begin
         end if;
     end process;
 
-    -- This process controls the shift of the input word and the corresponding byte enable signal to
-    -- it. When beginning of a transaction is captured, the shift is taken directly from the current
-    -- address, but when it continues, then select shift from the counter of addresses.
+    -- This process controls the shift of the input word and the corresponding byte enable signal to it.
+    -- When beginning of a transaction is captured, the shift is taken directly from the current address,
+    -- but when it continues, then select shift from the counter of addresses.
+
+    -- This part basically takes 3 bit of address (i assume that it's addressed by DWORDS) and use them to shift 
+    -- DWORDS in DATA and BYTE ENABLE signal to the LEFT (higher bits?)
+    -- Block in BS = DWORD
     wr_bshifter_ctrl_p : process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
     begin
@@ -147,7 +156,7 @@ begin
                 pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
                 wr_shift_sel         <= pcie_mfb_meta_addr_v(2 downto 0);
             else
-                wr_shift_sel <= std_logic_vector(addr_cntr_pst(2 downto 0));
+                wr_shift_sel         <= std_logic_vector(addr_cntr_pst(2 downto 0));
             end if;
         end if;
     end process;
@@ -156,26 +165,29 @@ begin
         generic map (
             BLOCKS     => 8,
             BLOCK_SIZE => 32,
-            SHIFT_LEFT => TRUE)
+            SHIFT_LEFT => TRUE
+        )
         port map (
             DATA_IN  => PCIE_MFB_DATA,
             DATA_OUT => wr_data_bram_bshifter,
-            SEL      => wr_shift_sel);
+            SEL      => wr_shift_sel
+        );
 
     wr_be_barrel_shifter_i : entity work.BARREL_SHIFTER_GEN
         generic map (
             BLOCKS     => 8,
             BLOCK_SIZE => 4,
-            SHIFT_LEFT => TRUE)
+            SHIFT_LEFT => TRUE
+        )
         port map (
             DATA_IN  => PCIE_MFB_META(META_BE),
             DATA_OUT => wr_be_bram_bshifter,
-            SEL      => wr_shift_sel);
+            SEL      => wr_shift_sel
+        );
 
-    -- This process oncrements the address on the lowest DWords when shift occurs. That means that
-    -- when data are shifted on the input, the rotation causes higher DWs to appear on the lower
-    -- positions. Writing on the same address could cause the overwrite of data already stored in
-    -- lower BRAMs.
+    -- This process increments the address on the lowest DWords when shift occurs. 
+    -- That means that when data are shifted on the input, the rotation causes higher DWs to appear on the lower positions. (True)
+    -- Writing on the same address could cause the overwrite of data already stored in lower BRAMs.
     wr_addr_recalc_p : process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
     begin
@@ -184,6 +196,9 @@ begin
         if (PCIE_MFB_SRC_RDY = '1') then
             if (PCIE_MFB_SOF = "1") then
                 pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
+                -- These are probably the bits that were used in shift machine
+                -- So these address bit are for Buffer?
+                -- Default assignment
                 wr_addr_bram_by_shift <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+3 -1 downto 3));
 
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
@@ -192,6 +207,7 @@ begin
                     end if;
                 end loop;
             else
+                -- others? What kind of magic is this?
                 wr_addr_bram_by_shift <= (others => std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH)+3 -1 downto 3)));
 
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
@@ -254,14 +270,16 @@ begin
                     COMMON_CLOCK   => TRUE,
                     OUTPUT_REG     => FALSE,
                     METADATA_WIDTH => 0,
-                    DEVICE         => DEVICE)
+                    DEVICE         => DEVICE
+                )
                 port map (
                     WR_CLK  => CLK,
                     WR_RST  => RESET,
-                    WR_EN   => wr_be_bram_demux(j)(i),
-                    WR_BE   => (others => '1'),
-                    WR_ADDR => wr_addr_bram_by_shift(i/4),
-                    WR_DATA => wr_data_bram_bshifter(i*8 +7 downto i*8),
+
+                    WR_EN       => wr_be_bram_demux(j)(i),
+                    WR_BE       => (others => '1'),
+                    WR_ADDR     => wr_addr_bram_by_shift(i/4),
+                    WR_DATA     => wr_data_bram_bshifter(i*8 +7 downto i*8),
 
                     RD_CLK      => CLK,
                     RD_RST      => RESET,
@@ -271,7 +289,8 @@ begin
                     RD_ADDR     => rd_addr_bram_by_shift(i),
                     RD_DATA     => rd_data_bram(j)(i*8 +7 downto i*8),
                     RD_META_OUT => open,
-                    RD_DATA_VLD => open);
+                    RD_DATA_VLD => open
+                );
         end generate;
     end generate;
 
@@ -292,11 +311,13 @@ begin
         generic map (
             BLOCKS     => 32,
             BLOCK_SIZE => 8,
-            SHIFT_LEFT => FALSE)
+            SHIFT_LEFT => FALSE
+        )
         port map (
             DATA_IN  => rd_data_bram_mux,
             DATA_OUT => RD_DATA,
-            SEL      => RD_ADDR(4 downto 0));
+            SEL      => RD_ADDR(4 downto 0)
+        );
 
     rd_addr_recalc_p : process (all) is
     begin
@@ -308,4 +329,5 @@ begin
             end if;
         end loop;
     end process;
+
 end architecture;
