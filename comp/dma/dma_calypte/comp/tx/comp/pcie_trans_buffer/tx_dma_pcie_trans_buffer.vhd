@@ -44,7 +44,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- Input MFB bus (quasi writing interface)
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-        PCIE_MFB_META    : in  std_logic_vector((MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+        PCIE_MFB_META    : in  std_logic_vector(PCIE_MFB_REGIONS*((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_SOF_POS : in  std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE)) -1 downto 0);
@@ -57,6 +57,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         --  
         -- Similar to BRAM block.
         -- =========================================================================================
+        -- Note: This will be shared for both regions
         RD_CHAN : in  std_logic_vector(log2(CHANNELS) -1 downto 0);
         RD_DATA : out std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
         RD_ADDR : in  std_logic_vector(POINTER_WIDTH -1 downto 0);
@@ -67,6 +68,7 @@ end entity;
 architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     constant MFB_LENGTH   : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
+    -- The Address is restricted by BAR_APERTURE (IP_core setting)
     constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
 
     -- =============================================================================================
@@ -146,6 +148,9 @@ begin
     -- This part basically takes 3 bit of address (i assume that it's addressed by DWORDS) and use them to shift 
     -- DWORDS in DATA and BYTE ENABLE signal to the LEFT (higher bits?)
     -- Block in BS = DWORD
+
+    -- The "2 downto 0" is specification of address
+    -- The address system here is divided into two parts -> becasuse of BRAM configuration
     wr_bshifter_ctrl_p : process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
     begin
@@ -197,7 +202,7 @@ begin
             if (PCIE_MFB_SOF = "1") then
                 pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
                 -- These are probably the bits that were used in shift machine
-                -- So these address bit are for Buffer?
+                -- So these address bit are for Buffer? - It's address within the single BRAM
                 -- Default assignment
                 wr_addr_bram_by_shift <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+3 -1 downto 3));
 
@@ -207,7 +212,6 @@ begin
                     end if;
                 end loop;
             else
-                -- others? What kind of magic is this?
                 wr_addr_bram_by_shift <= (others => std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH)+3 -1 downto 3)));
 
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
@@ -243,6 +247,7 @@ begin
         end if;
     end process;
 
+    -- 
     wr_bram_data_demux_p : process (all) is
     begin
         wr_be_bram_demux <= (others => (others => '0'));
@@ -251,7 +256,7 @@ begin
             if (PCIE_MFB_SOF = "1") then
                 wr_be_bram_demux(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
             else
-                wr_be_bram_demux(to_integer(unsigned(chan_num_pst))) <= wr_be_bram_bshifter;
+                wr_be_bram_demux(to_integer(unsigned(chan_num_pst)))                 <= wr_be_bram_bshifter;
             end if;
         end if;
     end process;
@@ -293,6 +298,49 @@ begin
                 );
         end generate;
     end generate;
+
+
+    -- =============================================================================================
+    -- Dual port BRAM - 2 inputs
+    -- =============================================================================================
+    -- dp_bram_be_i : entity work.DP_BRAM_BEHAV
+    --     generic map (
+    --         DATA_WIDTH => 8;
+    --         ITEMS      => BUFFER_DEPTH;
+    --         OUTPUT_REG => FALSE;
+    --         -- What operation will be performed first when write and read are active
+    --         -- in same time and same port? Possible values are:
+    --         -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
+    --         -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be
+    --         --               - implemented into logic!
+    --         RDW_MODE_A => "WRITE_FIRST";
+    --         RDW_MODE_B => "WRITE_FIRST"
+    --     );
+    --     port map (
+    --         CLK => CLK,
+    --         RST => RESET,
+    --         -- =======================================================================
+    --         -- Port A
+    --         -- =======================================================================
+    --         PIPE_ENA : in  std_logic;                                   -- Enable of port A and output register, required extra logic on Intel FPGA
+    --         REA      : in  std_logic;                                   -- Read enable of port A, only for generation DOA_DV
+    --         WEA      : in  std_logic;                                   -- Write enable of port A
+    --         ADDRA    : in  std_logic_vector(log2(ITEMS)-1 downto 0);    -- Port A address
+    --         DIA      : in  std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port A data in
+    --         DOA      : out std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port A data out
+    --         DOA_DV   : out std_logic;                                   -- Port A data out valid
+    --         -- =======================================================================
+    --         -- Port B
+    --         -- =======================================================================
+    --         PIPE_ENB : in  std_logic;                                   -- Enable of port B and output register, required extra logic on Intel FPGA
+    --         REB      : in  std_logic;                                   -- Read enable of port B, only for generation DOB_DV
+    --         WEB      : in  std_logic;                                   -- Write enable of port B
+    --         ADDRB    : in  std_logic_vector(log2(ITEMS)-1 downto 0);    -- Port B address
+    --         DIB      : in  std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port B data in
+    --         DOB      : out std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port B data out
+    --         DOB_DV   : out std_logic                                    -- Port B data out valid
+    --     );
+     
 
     rd_en_demux : process (all) is
     begin
