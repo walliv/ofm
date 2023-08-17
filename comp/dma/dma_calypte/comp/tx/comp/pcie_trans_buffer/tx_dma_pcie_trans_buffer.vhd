@@ -58,16 +58,19 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- Similar to BRAM block.
         -- =========================================================================================
         -- Note: This will be shared for both regions
-        RD_CHAN : in  std_logic_vector(log2(CHANNELS) -1 downto 0);
-        RD_DATA : out std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-        RD_ADDR : in  std_logic_vector(POINTER_WIDTH -1 downto 0);
-        RD_EN   : in  std_logic
+        RD_CHAN     : in  std_logic_vector(log2(CHANNELS) -1 downto 0);
+        RD_DATA     : out std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
+        RD_ADDR     : in  std_logic_vector(POINTER_WIDTH -1 downto 0);
+        RD_EN       : in  std_logic;
+        RD_DATA_VLD : out std_logic
     );
 end entity;
 
 architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     constant MFB_LENGTH   : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
+    -- Number of items in MFB word
+    constant MFB_ITEMS    : MFB_LENGTH/MFB_ITEM_WIDTH;
     -- The Address is restricted by BAR_APERTURE (IP_core setting)
     constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
 
@@ -94,12 +97,12 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal addr_cntr_nst            : unsigned(PCIE_MFB_META(META_PCIE_ADDR)'length -1 downto 0);
 
     -- control of the amount of shift on the writing barrel shifters
-    signal wr_shift_sel             : std_logic_vector(log2(MFB_LENGTH/32) -1 downto 0);
+    signal wr_shift_sel             : slv_array_t(MFB_REGIONS - 1 downto 0)(log2(MFB_LENGTH/32) -1 downto 0);
 
-    signal wr_be_bram_bshifter      : std_logic_vector((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_be_bram_bshifter      : slv_array_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_be_bram_demux         : slv_array_t(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
-    signal wr_data_bram_bshifter    : std_logic_vector(MFB_LENGTH -1 downto 0);
+    signal wr_data_bram_bshifter    : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
     signal chan_num_pst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
     signal chan_num_nst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
@@ -109,8 +112,19 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal rd_data_bram             : slv_array_t(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
     signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
-begin
+    -- 2 regions stuff
+    signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
 
+begin
+    -- =============================================================================================
+    -- Prototype
+    -- =============================================================================================
+
+    -- Meta array
+    pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
+
+    -- Last SOF
+    -- Higher takes
     addr_cntr_reg_p : process (CLK) is
     begin
         if (rising_edge(CLK)) then
@@ -132,11 +146,23 @@ begin
 
         -- When the new packet arrives his address is saved and incremented by a region size
         -- What about packet that fits into one region? - Interesting
+
+        -- Careful there! The number '8' is correct only for one region
+        -- I think the EOF is not relevant at all 
+
         if (PCIE_MFB_SRC_RDY = '1') then
-            if (PCIE_MFB_SOF = "1" and PCIE_MFB_EOF = "0") then
-                addr_cntr_nst <= unsigned(PCIE_MFB_META(META_PCIE_ADDR)) + 8;
-            elsif (PCIE_MFB_SOF = "0" and PCIE_MFB_EOF = "0") then
-                addr_cntr_nst <= addr_cntr_pst + 8;
+            -- +16
+            addr_cntr_nst <= addr_cntr_pst + MFB_REGIONS*MFB_BLOCK_SIZE;
+
+            if (PCIE_MFB_SOF(0) = '1') then
+                -- +16
+                addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(0)(META_PCIE_ADDR)) + MFB_REGIONS*MFB_BLOCK_SIZE;
+            end if;
+
+            if (PCIE_MFB_SOF(1) = '1') then
+                -- Note: MFB_REGIONS - 'i' be a solution
+                -- +8
+                addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) + MFB_BLOCK_SIZE;
             end if;
         end if;
     end process;
@@ -149,46 +175,105 @@ begin
     -- DWORDS in DATA and BYTE ENABLE signal to the LEFT (higher bits?)
     -- Block in BS = DWORD
 
-    -- The "2 downto 0" is specification of address
+    -- The "2 downto 0" is specification of address - now generic
     -- The address system here is divided into two parts -> becasuse of BRAM configuration
-    wr_bshifter_ctrl_p : process (all) is
+
+    wr_bshifter_0_ctrl_p : process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
     begin
-        wr_shift_sel <= (others => '0');
+        wr_shift_sel(0) <= (others => '0');
 
         if (PCIE_MFB_SRC_RDY = '1') then
-            if (PCIE_MFB_SOF = "1") then
-                pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
-                wr_shift_sel         <= pcie_mfb_meta_addr_v(2 downto 0);
+            if (PCIE_MFB_SOF(0) = '1') then
+                pcie_mfb_meta_addr_v    := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
+                wr_shift_sel(0)         <= pcie_mfb_meta_addr_v(log2(MFB_ITEMS) - 1  downto 0);
             else
-                wr_shift_sel         <= std_logic_vector(addr_cntr_pst(2 downto 0));
+                -- Shared address
+                wr_shift_sel(0)         <= std_logic_vector(addr_cntr_pst(log2(MFB_ITEMS) - 1 downto 0));
             end if;
         end if;
     end process;
 
-    wr_data_barrel_shifter_i : entity work.BARREL_SHIFTER_GEN
+    -- This packet starts at the beginning of the second region, so we need to correct the address by the number of DWords in region
+    -- It can be done at the input of the BS
+    -- Control for second region
+    wr_bshifter_1_ctrl_p : process (all) is
+        variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
+    begin
+        wr_shift_sel(1) <= (others => '0');
+
+        if (PCIE_MFB_SRC_RDY = '1') then
+            if (PCIE_MFB_SOF(1) = '1') then
+                pcie_mfb_meta_addr_v    := pcie_mfb_meta_arr(1)(META_PCIE_ADDR);
+                wr_shift_sel(1)         <= pcie_mfb_meta_addr_v(log2(MFB_ITEMS) - 1  downto 0);
+            elsif (PCIE_MFB_SOF(0) = '1') then
+                pcie_mfb_meta_addr_v    := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
+                wr_shift_sel(1)         <= pcie_mfb_meta_addr_v(log2(MFB_ITEMS) - 1  downto 0);                
+            else 
+                -- Shared address
+                wr_shift_sel(1)         <= std_logic_vector(addr_cntr_pst(log2(MFB_ITEMS) - 1 downto 0));
+            end if;
+        end if;
+    end process;
+
+    -- Connect to Port A
+    wr_data_barrel_shifter_0_i : entity work.BARREL_SHIFTER_GEN
         generic map (
-            BLOCKS     => 8,
-            BLOCK_SIZE => 32,
+            BLOCKS     => MFB_REGIONS*MFB_BLOCK_SIZE,
+            BLOCK_SIZE => MFB_ITEM_WIDTH,
             SHIFT_LEFT => TRUE
         )
         port map (
             DATA_IN  => PCIE_MFB_DATA,
-            DATA_OUT => wr_data_bram_bshifter,
-            SEL      => wr_shift_sel
+            DATA_OUT => wr_data_bram_bshifter(0),
+            SEL      => wr_shift_sel(0)
         );
 
-    wr_be_barrel_shifter_i : entity work.BARREL_SHIFTER_GEN
+    -- This BS is used for shifting data that start in second region
+    -- Connect to Port B
+    wr_data_barrel_shifter_1_i : entity work.BARREL_SHIFTER_GEN
+    generic map (
+        BLOCKS     => MFB_REGIONS*MFB_BLOCK_SIZE,
+        BLOCK_SIZE => MFB_ITEM_WIDTH,
+        SHIFT_LEFT => TRUE
+    )
+    port map (
+        DATA_IN  => PCIE_MFB_DATA,
+        DATA_OUT => wr_data_bram_bshifter(1),
+        -- TODO: Check that this works correctly
+        SEL      => std_logic_vector(unsigned(wr_shift_sel(1)) + 8)
+    );        
+
+    
+    -- Byte enable (first region) for port A
+    wr_be_barrel_shifter_0_i : entity work.BARREL_SHIFTER_GEN
         generic map (
-            BLOCKS     => 8,
+            BLOCKS     => MFB_REGIONS*MFB_BLOCK_SIZE,
             BLOCK_SIZE => 4,
             SHIFT_LEFT => TRUE
         )
         port map (
-            DATA_IN  => PCIE_MFB_META(META_BE),
-            DATA_OUT => wr_be_bram_bshifter,
-            SEL      => wr_shift_sel
+            DATA_IN  => pcie_mfb_meta_arr(0)(META_BE),
+            DATA_OUT => wr_be_bram_bshifter(0),
+            SEL      => wr_shift_sel(0)
         );
+        
+    -- Byte enable (second region) port B
+    wr_be_barrel_shifter_1_i : entity work.BARREL_SHIFTER_GEN
+        generic map (
+            BLOCKS     => MFB_REGIONS*MFB_BLOCK_SIZE,
+            BLOCK_SIZE => 4,
+            SHIFT_LEFT => TRUE
+        )
+        port map (
+            DATA_IN  => pcie_mfb_meta_arr(1)(META_BE),
+            DATA_OUT => wr_be_bram_bshifter(1),
+            SEL      => std_logic_vector(unsigned(wr_shift_sel(1)) + 8)
+        );
+
+    -- =============================================================================================
+    -- End of Prototype
+    -- =============================================================================================
 
     -- This process increments the address on the lowest DWords when shift occurs. 
     -- That means that when data are shifted on the input, the rotation causes higher DWs to appear on the lower positions. (True)
@@ -203,6 +288,7 @@ begin
                 pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
                 -- These are probably the bits that were used in shift machine
                 -- So these address bit are for Buffer? - It's address within the single BRAM
+                    -- Wiser me: These bits address a column of bits
                 -- Default assignment
                 wr_addr_bram_by_shift <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+3 -1 downto 3));
 
@@ -311,10 +397,10 @@ begin
     --         -- What operation will be performed first when write and read are active
     --         -- in same time and same port? Possible values are:
     --         -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
-    --         -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be
-    --         --               - implemented into logic!
-    --         RDW_MODE_A => "WRITE_FIRST";
-    --         RDW_MODE_B => "WRITE_FIRST"
+    --         -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
+            
+    --         RDW_MODE_A => "READ_FIRST";
+    --         RDW_MODE_B => "READ_FIRST"
     --     );
     --     port map (
     --         CLK => CLK,
