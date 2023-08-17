@@ -44,7 +44,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- Input MFB bus (quasi writing interface)
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-        PCIE_MFB_META    : in  std_logic_vector(PCIE_MFB_REGIONS*((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
+        PCIE_MFB_META    : in  std_logic_vector(MFB_REGIONS*((MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_SOF_POS : in  std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE)) -1 downto 0);
@@ -101,7 +101,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     signal wr_be_bram_bshifter      : slv_array_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_be_bram_demux         : slv_array_t(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     signal wr_data_bram_bshifter    : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
     signal chan_num_pst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
@@ -154,16 +154,12 @@ begin
             -- +16
             addr_cntr_nst <= addr_cntr_pst + MFB_REGIONS*MFB_BLOCK_SIZE;
 
-            if (PCIE_MFB_SOF(0) = '1') then
-                -- +16
-                addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(0)(META_PCIE_ADDR)) + MFB_REGIONS*MFB_BLOCK_SIZE;
-            end if;
-
-            if (PCIE_MFB_SOF(1) = '1') then
-                -- Note: MFB_REGIONS - 'i' be a solution
-                -- +8
-                addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) + MFB_BLOCK_SIZE;
-            end if;
+            for i 0 to (MFB_REGIONS - 1) then 
+                if (PCIE_MFB_SOF(i) = '1') then
+                    -- +16 / +8
+                    addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(0)(META_PCIE_ADDR)) + (MFB_REGIONS - i)*MFB_BLOCK_SIZE;
+                end if;
+            end loop          
         end if;
     end process;
 
@@ -204,7 +200,8 @@ begin
 
         if (PCIE_MFB_SRC_RDY = '1') then
             if (PCIE_MFB_SOF(1) = '1') then
-                pcie_mfb_meta_addr_v    := pcie_mfb_meta_arr(1)(META_PCIE_ADDR);
+                -- The '+8' is MFB_BLOCK_SIZE and is only used when the SOF is in the second region
+                pcie_mfb_meta_addr_v    := std_logic_vector(unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) + 8);
                 wr_shift_sel(1)         <= pcie_mfb_meta_addr_v(log2(MFB_ITEMS) - 1  downto 0);
             elsif (PCIE_MFB_SOF(0) = '1') then
                 pcie_mfb_meta_addr_v    := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
@@ -240,8 +237,7 @@ begin
     port map (
         DATA_IN  => PCIE_MFB_DATA,
         DATA_OUT => wr_data_bram_bshifter(1),
-        -- TODO: Check that this works correctly
-        SEL      => std_logic_vector(unsigned(wr_shift_sel(1)) + 8)
+        SEL      => wr_shift_sel(1)
     );        
 
     
@@ -268,50 +264,82 @@ begin
         port map (
             DATA_IN  => pcie_mfb_meta_arr(1)(META_BE),
             DATA_OUT => wr_be_bram_bshifter(1),
-            SEL      => std_logic_vector(unsigned(wr_shift_sel(1)) + 8)
+            SEL      => wr_shift_sel(1)
         );
+
+    -- This process increments the address on the lowest DWords when shift occurs. 
+    -- That means that when data are shifted on the input, the rotation causes higher DWs to appear on the lower positions.
+    -- Writing on the same address could cause the overwrite of data already stored in lower BRAMs.
+
+    -- Possibilites:
+    --     SOF(0) SOF(1)
+    -- 1)    0      0
+    -- 2)    0      1
+    -- 3)    1      0
+    -- 4)    1      1
+
+    -- Backward compatibility: Probably
+    wr_addr_recalc_p : process (all) is
+        variable pcie_mfb_meta_addr_v : slv_array_t(MFB_REGIONS - 1 downto 0)(META_PCIE_ADDR_W -1 downto 0);
+    begin
+
+        -- This condition decides which address will be used for data in second region
+        -- This covers combinations 1) and 3) for data in second region
+        if (PCIE_MFB_SOF(0) = '1') then
+            pcie_mfb_meta_addr_v(MFB_REGIONS - 1)  := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
+        else 
+            pcie_mfb_meta_addr_v(MFB_REGIONS - 1)  := std_logic_vector(addr_cntr_pst);
+        end if;
+
+        -- This has been added to ensure looping compatibility
+        -- Combination 1) and 2) for first region
+        pcie_mfb_meta_addr_v(0) := std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS)));
+
+        -- Don't ask what is happening here. I don't know
+        for j in 0 to MFB_REGIONS - 1 loop
+            wr_addr_bram_by_shift(j) <= (others => (others => '0'));
+
+            if (PCIE_MFB_SRC_RDY = '1') then
+                if (PCIE_MFB_SOF(j) = '1') then
+                    -- Pass address to variable
+                    -- Add number of items in region - used in second region
+                    pcie_mfb_meta_addr_v(j) := std_logic_vector(unsigned(pcie_mfb_meta_arr(j)(META_PCIE_ADDR)) + j*MFB_BLOCK_SIZE);
+    
+                    wr_addr_bram_by_shift(j) <= (others => pcie_mfb_meta_addr_v(j)(log2(BUFFER_DEPTH)+log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS)));
+
+                    -- Increment address in bytes that overflowed
+                    for i in 0 to ((MFB_LENGTH/32) -1) loop
+                        if (i < unsigned(pcie_mfb_meta_addr_v(j)(log2(MFB_ITEMS) - 1 downto 0))) then
+                            wr_addr_bram_by_shift(j)(i) <= std_logic_vector(unsigned(pcie_mfb_meta_addr_v(j)(log2(BUFFER_DEPTH)+log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS))) + 1);
+                        end if;
+                    end loop;
+                else
+                    -- SOF in current region is 0
+                    -- If this happens in the first region - Saved address is passed
+                    -- If this happens in the second region - Current or Saved address is passed based on SOF in first region
+                    wr_addr_bram_by_shift(j) <= (others => pcie_mfb_meta_addr_v(j)(log2(BUFFER_DEPTH) + log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS)));
+
+                    -- Increment address in bytes that overflowed
+                    for i in 0 to ((MFB_LENGTH/32) -1) loop
+                        if (i < unsigned(pcie_mfb_meta_addr_v(j)(log2(MFB_ITEMS) - 1 downto 0))) then
+                            wr_addr_bram_by_shift(j)(i) <= std_logic_vector(unsigned(pcie_mfb_meta_addr_v(j)(log2(BUFFER_DEPTH) + log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS))) + 1);
+                        end if;
+                    end loop;                        
+                end if;
+            end if;
+        end loop;
+    end process;
 
     -- =============================================================================================
     -- End of Prototype
     -- =============================================================================================
-
-    -- This process increments the address on the lowest DWords when shift occurs. 
-    -- That means that when data are shifted on the input, the rotation causes higher DWs to appear on the lower positions. (True)
-    -- Writing on the same address could cause the overwrite of data already stored in lower BRAMs.
-    wr_addr_recalc_p : process (all) is
-        variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
-    begin
-        wr_addr_bram_by_shift <= (others => (others => '0'));
-
-        if (PCIE_MFB_SRC_RDY = '1') then
-            if (PCIE_MFB_SOF = "1") then
-                pcie_mfb_meta_addr_v := PCIE_MFB_META(META_PCIE_ADDR);
-                -- These are probably the bits that were used in shift machine
-                -- So these address bit are for Buffer? - It's address within the single BRAM
-                    -- Wiser me: These bits address a column of bits
-                -- Default assignment
-                wr_addr_bram_by_shift <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+3 -1 downto 3));
-
-                for i in 0 to ((MFB_LENGTH/32) -1) loop
-                    if (i < unsigned(pcie_mfb_meta_addr_v(2 downto 0))) then
-                        wr_addr_bram_by_shift(i) <= std_logic_vector(unsigned(pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+3 -1 downto 3)) + 1);
-                    end if;
-                end loop;
-            else
-                wr_addr_bram_by_shift <= (others => std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH)+3 -1 downto 3)));
-
-                for i in 0 to ((MFB_LENGTH/32) -1) loop
-                    if (i < addr_cntr_pst(2 downto 0)) then
-                        wr_addr_bram_by_shift(i) <= std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH)+3 -1 downto 3) + 1);
-                    end if;
-                end loop;
-            end if;
-        end if;
-    end process;
-
     -- =============================================================================================
     -- Demultiplexers
     -- =============================================================================================
+    -- TODO: Two port configuration
+    -- REG_0_CH     - If there are data in region one (or else)
+    -- REG_1_CH     - If there are data in region two
+    -- REG_SHARED   - Last valid channel
     chan_num_hold_reg_p : process (CLK) is
     begin
         if (rising_edge(CLK)) then
@@ -328,8 +356,13 @@ begin
     begin
         chan_num_nst <= chan_num_pst;
 
-        if (PCIE_MFB_SRC_RDY = '1' and PCIE_MFB_SOF = "1") then
-            chan_num_nst <= PCIE_MFB_META(META_CHAN_NUM);
+        -- Higher takes
+        if (PCIE_MFB_SRC_RDY = '1') then 
+            for i 0 to (MFB_REGIONS - 1) then 
+                if (PCIE_MFB_SOF(i) = '1') then
+                    chan_num_nst <= PCIE_MFB_META(META_CHAN_NUM);
+                end if;
+            end loop           
         end if;
     end process;
 
