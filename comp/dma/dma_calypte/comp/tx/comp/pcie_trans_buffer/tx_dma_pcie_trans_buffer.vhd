@@ -100,7 +100,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal wr_shift_sel             : slv_array_t(MFB_REGIONS - 1 downto 0)(log2(MFB_LENGTH/32) -1 downto 0);
 
     signal wr_be_bram_bshifter      : slv_array_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_be_bram_demux         : slv_array_t(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_be_bram_demux         : slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     signal wr_data_bram_bshifter    : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
@@ -114,6 +114,14 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     -- 2 regions stuff
     signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+
+    -- PCIE_MFB_DATA'length/32 => PCIE_MFB_DATA'length/ 8
+    signal wr_addr_bram_by_trim     : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    -- Read/Write - TDP
+    signal rw_addr_bram_by_mux      : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+
+    signal rd_a_data_valid         : std_logic;
+    signal rd_b_data_valid         : std_logic;
 
 begin
     -- =============================================================================================
@@ -331,9 +339,6 @@ begin
     end process;
 
     -- =============================================================================================
-    -- End of Prototype
-    -- =============================================================================================
-    -- =============================================================================================
     -- Demultiplexers
     -- =============================================================================================
     -- TODO: Two port configuration
@@ -352,6 +357,7 @@ begin
     end process;
 
     -- this FSM stores the number of a channel in order to properly steer the demultiplexers
+    -- That was true, but now it stores last valid channel
     chan_num_hold_nst_logic_p : process (all) is
     begin
         chan_num_nst <= chan_num_pst;
@@ -360,106 +366,195 @@ begin
         if (PCIE_MFB_SRC_RDY = '1') then 
             for i 0 to (MFB_REGIONS - 1) then 
                 if (PCIE_MFB_SOF(i) = '1') then
-                    chan_num_nst <= PCIE_MFB_META(META_CHAN_NUM);
+                    chan_num_nst <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
                 end if;
             end loop           
         end if;
     end process;
 
-    -- 
+    -- Select the channel information 
+    -- Possibilites:
+    --     SOF(0) SOF(1)
+    -- 1)    0      0
+    -- 2)    0      1
+    -- 3)    1      0
+    -- 4)    1      1
+
+    -- In the first case, we simply select the stored value (chan_num_pst) - Both regions
+    -- In the second case - First region takes stored value
+    --                    - Second region takes actual value of meta(1)
+    -- In the third case - First region takes actual value 
+    --                   - Second region takes value of region one
+    -- In the fourth case - First region takes actual value
+    --                    - Second region takes actual value
+
+    -- Default: 
     wr_bram_data_demux_p : process (all) is
     begin
-        wr_be_bram_demux <= (others => (others => '0'));
+        for i 0 to (MFB_REGIONS - 1) loop
+            wr_be_bram_demux(i) <= (others => (others => '0'));
 
-        if (PCIE_MFB_SRC_RDY = '1') then
-            if (PCIE_MFB_SOF = "1") then
-                wr_be_bram_demux(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
-            else
-                wr_be_bram_demux(to_integer(unsigned(chan_num_pst)))                 <= wr_be_bram_bshifter;
+            if (PCIE_MFB_SRC_RDY = '1') then
+                -- Default: Stored value - combination 1) and 2)
+                wr_be_bram_demux(i)(to_integer(unsigned(chan_num_pst))) <= wr_be_bram_bshifter;
+
+                if (PCIE_MFB_SOF(i) = '1') then
+                    wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
+                -- This seems strange, but in the second loop it will cover combination 3)
+                -- No effect in first loop
+                elsif (PCIE_MFB_SOF(0) = '1') then 
+                        wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(0)(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
+                end if;
             end if;
-        end if;
+        end loop
     end process;
 
-    brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
-        sdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
-            sdp_bram_be_i : entity work.SDP_BRAM_BE
-                generic map (
-                    BLOCK_ENABLE   => false,
-                    -- allow individual bytes to be assigned
-                    BLOCK_WIDTH    => 8,
-                    -- each BRAM allows to write a single DW
-                    DATA_WIDTH     => 8,
-                    -- the depth of the buffer
-                    ITEMS          => BUFFER_DEPTH,
-                    COMMON_CLOCK   => TRUE,
-                    OUTPUT_REG     => FALSE,
-                    METADATA_WIDTH => 0,
-                    DEVICE         => DEVICE
-                )
-                port map (
-                    WR_CLK  => CLK,
-                    WR_RST  => RESET,
+    -- brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
+    --     sdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
+    --         sdp_bram_be_i : entity work.SDP_BRAM_BE
+    --             generic map (
+    --                 BLOCK_ENABLE   => false,
+    --                 -- allow individual bytes to be assigned
+    --                 BLOCK_WIDTH    => 8,
+    --                 -- each BRAM allows to write a single DW
+    --                 DATA_WIDTH     => 8,
+    --                 -- the depth of the buffer
+    --                 ITEMS          => BUFFER_DEPTH,
+    --                 COMMON_CLOCK   => TRUE,
+    --                 OUTPUT_REG     => FALSE,
+    --                 METADATA_WIDTH => 0,
+    --                 DEVICE         => DEVICE
+    --             )
+    --             port map (
+    --                 WR_CLK  => CLK,
+    --                 WR_RST  => RESET,
 
-                    WR_EN       => wr_be_bram_demux(j)(i),
-                    WR_BE       => (others => '1'),
-                    WR_ADDR     => wr_addr_bram_by_shift(i/4),
-                    WR_DATA     => wr_data_bram_bshifter(i*8 +7 downto i*8),
+    --                 WR_EN       => wr_be_bram_demux(j)(i),
+    --                 WR_BE       => (others => '1'),
+    --                 WR_ADDR     => wr_addr_bram_by_shift(i/4),
+    --                 WR_DATA     => wr_data_bram_bshifter(i*8 +7 downto i*8),
 
-                    RD_CLK      => CLK,
-                    RD_RST      => RESET,
-                    RD_EN       => '1',
-                    RD_PIPE_EN  => rd_en_bram_demux(j),
-                    RD_META_IN  => (others => '0'),
-                    RD_ADDR     => rd_addr_bram_by_shift(i),
-                    RD_DATA     => rd_data_bram(j)(i*8 +7 downto i*8),
-                    RD_META_OUT => open,
-                    RD_DATA_VLD => open
-                );
-        end generate;
+    --                 RD_CLK      => CLK,
+    --                 RD_RST      => RESET,
+    --                 RD_EN       => '1',
+    --                 RD_PIPE_EN  => rd_en_bram_demux(j),
+    --                 RD_META_IN  => (others => '0'),
+    --                 RD_ADDR     => rd_addr_bram_by_shift(i),
+    --                 RD_DATA     => rd_data_bram(j)(i*8 +7 downto i*8),
+    --                 RD_META_OUT => open,
+    --                 RD_DATA_VLD => open
+    --             );
+    --     end generate;
+    -- end generate;
+
+    -- =============================================================================================
+    -- Dual port BRAM - Control logic
+    -- =============================================================================================
+    -- So... here we need to control the TDP, because we can't read from the same port as we write
+    -- In this part, we check which ports are in use and read from those that are not
+    -- To do this, we must control channel - meta(CHAN) and validity - meta(BE)(0) of both regions 
+    -- pcie_mfb_meta_arr(0)(META_CHAN_NUM)
+    -- pcie_mfb_meta_arr(1)(META_CHAN_NUM)
+
+    -- pcie_mfb_meta_arr(0)(META_BE)
+    -- pcie_mfb_meta_arr(1)(META_BE)
+
+    -- -- The channel simply chooses to which BRAM slice the address and enable goes 
+    -- -- The address will be connected to all BRAM... so it doesn't matter.
+    -- pcie_mfb_meta_arr(0)(META_PCIE_ADDR)    -- not this one
+    -- pcie_mfb_meta_arr(1)(META_PCIE_ADDR)    -- not this one
+
+    -- for i in 0 to ((MFB_LENGTH/32) -1) loop
+    --     if (i < addr_cntr_pst(2 downto 0)) then
+    --         wr_addr_bram_by_shift(i) <= std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH)+3 -1 downto 3) + 1);
+    --     end if;
+    -- end loop;
+
+    -- -- Note PCIE_MFB_DATA'length/32
+    -- signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+
+    -- -- Note PCIE_MFB_DATA'length/8
+    -- signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    -- signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+
+
+    -- Address management - Channel independent
+    -- Get rid of unnecessary addresses
+    addr_trim_regions_g : for i in 0 to MFB_REGIONS - 1 generate
+        addr_trim_p: process(all) 
+        begin
+            for j in 0 to ((MFB_LENGTH/8) -1) loop
+                wr_addr_bram_by_trim(i)(j) <= wr_addr_bram_by_shift(j/4);
+            end loop;
+        end process;
     end generate;
 
+    -- The Address mutliplexor
+    addr_mux_p : for i in 0 to MFB_REGIONS - 1 generate
+        addr_mux_p: process(all)
+        begin
+            -- Default assignment
+            rw_addr_bram_by_mux(i)  <= (others => (others => '0'));
+            
+            if (PCIE_MFB_SRC_RDY = '1') then
+                -- The first bit Byte Enable is enough to decide
+                if (pcie_mfb_meta_arr(i)(META_BE)(0) ='1') then
+                    rw_addr_bram_by_mux(i) <= wr_addr_bram_by_trim(i);
+                else
+                    rw_addr_bram_by_mux(i) <= rd_addr_bram_by_shift;
+                end if;
+            end if;
+        end process;
+    end generate;
 
     -- =============================================================================================
     -- Dual port BRAM - 2 inputs
     -- =============================================================================================
-    -- dp_bram_be_i : entity work.DP_BRAM_BEHAV
-    --     generic map (
-    --         DATA_WIDTH => 8;
-    --         ITEMS      => BUFFER_DEPTH;
-    --         OUTPUT_REG => FALSE;
-    --         -- What operation will be performed first when write and read are active
-    --         -- in same time and same port? Possible values are:
-    --         -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
-    --         -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
-            
-    --         RDW_MODE_A => "READ_FIRST";
-    --         RDW_MODE_B => "READ_FIRST"
-    --     );
-    --     port map (
-    --         CLK => CLK,
-    --         RST => RESET,
-    --         -- =======================================================================
-    --         -- Port A
-    --         -- =======================================================================
-    --         PIPE_ENA : in  std_logic;                                   -- Enable of port A and output register, required extra logic on Intel FPGA
-    --         REA      : in  std_logic;                                   -- Read enable of port A, only for generation DOA_DV
-    --         WEA      : in  std_logic;                                   -- Write enable of port A
-    --         ADDRA    : in  std_logic_vector(log2(ITEMS)-1 downto 0);    -- Port A address
-    --         DIA      : in  std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port A data in
-    --         DOA      : out std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port A data out
-    --         DOA_DV   : out std_logic;                                   -- Port A data out valid
-    --         -- =======================================================================
-    --         -- Port B
-    --         -- =======================================================================
-    --         PIPE_ENB : in  std_logic;                                   -- Enable of port B and output register, required extra logic on Intel FPGA
-    --         REB      : in  std_logic;                                   -- Read enable of port B, only for generation DOB_DV
-    --         WEB      : in  std_logic;                                   -- Write enable of port B
-    --         ADDRB    : in  std_logic_vector(log2(ITEMS)-1 downto 0);    -- Port B address
-    --         DIB      : in  std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port B data in
-    --         DOB      : out std_logic_vector(DATA_WIDTH-1 downto 0);     -- Port B data out
-    --         DOB_DV   : out std_logic                                    -- Port B data out valid
-    --     );
-     
+    -- Note: One Channel
+    -- Note: Connect Read Data to the output
+    tdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
+        tdp_bram_be_i : entity work.DP_BRAM_BEHAV
+            generic map (
+                DATA_WIDTH => 8;
+                ITEMS      => BUFFER_DEPTH;
+                OUTPUT_REG => FALSE;
+                -- What operation will be performed first when write and read are active
+                -- in same time and same port? Possible values are:
+                -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
+                -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
+                
+                RDW_MODE_A => "READ_FIRST";
+                RDW_MODE_B => "READ_FIRST"
+            );
+            port map (
+                CLK => CLK,
+                RST => RESET,
+                -- =======================================================================
+                -- Port A
+                -- =======================================================================
+                PIPE_ENA : in  std_logic;                                   -- Enable of port A and output register, required extra logic on Intel FPGA
+                REA      : in  std_logic;                                   -- Read enable of port A, only for generation DOA_DV
+                WEA      : in  std_logic;                                   -- Write enable of port A
+                ADDRA    => rw_addr_bram_by_mux(0)(i),
+                DIA      => wr_data_bram_bshifter(0)(i*8 +7 downto i*8),
+                DOA      => rd_data_bram(0)(i*8 +7 downto i*8),
+                DOA_DV   => rd_a_data_valid,
+                -- =======================================================================
+                -- Port B
+                -- =======================================================================
+                PIPE_ENB : in  std_logic;                                   -- Enable of port B and output register, required extra logic on Intel FPGA
+                REB      : in  std_logic;                                   -- Read enable of port B, only for generation DOB_DV
+                WEB      : in  std_logic;                                   -- Write enable of port B
+                ADDRB    => rw_addr_bram_by_mux(1)(i),
+                DIB      => wr_data_bram_bshifter(1)(i*8 +7 downto i*8),
+                DOB      => rd_data_bram(1)(i*8 +7 downto i*8),
+                DOB_DV   => rd_b_data_valid
+            );
+    end generate;
+
+    -- =============================================================================================
+    -- End of Prototype
+    -- =============================================================================================     
 
     rd_en_demux : process (all) is
     begin
@@ -496,5 +591,10 @@ begin
             end if;
         end loop;
     end process;
+
+
+    -- Output 
+    -- Note: One Channel
+    RD_DATA_VLD <= rd_a_data_valid or rd_b_data_valid;
 
 end architecture;
