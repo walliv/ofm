@@ -28,7 +28,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- =========================================================================================
         -- Input PCIe interface parameters
         -- =========================================================================================
-        MFB_REGIONS     : natural := 1;
+        MFB_REGIONS     : natural := 2;
         MFB_REGION_SIZE : natural := 1;
         MFB_BLOCK_SIZE  : natural := 8;
         MFB_ITEM_WIDTH  : natural := 32;
@@ -70,7 +70,9 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     constant MFB_LENGTH   : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
     -- Number of items in MFB word
-    constant MFB_ITEMS    : MFB_LENGTH/MFB_ITEM_WIDTH;
+    constant MFB_ITEMS    : natural := MFB_LENGTH/MFB_ITEM_WIDTH;
+    -- Number of bytes in MFB word 
+    constant MFB_BYTES    : natural :=  MFB_LENGTH/8;
     -- The Address is restricted by BAR_APERTURE (IP_core setting)
     constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
 
@@ -113,15 +115,17 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
     -- 2 regions stuff
-    signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+    signal pcie_mfb_meta_arr        : slv_array_t(MFB_REGIONS - 1 downto 0)((MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
 
     -- PCIE_MFB_DATA'length/32 => PCIE_MFB_DATA'length/ 8
     signal wr_addr_bram_by_trim     : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     -- Read/Write - TDP
     signal rw_addr_bram_by_mux      : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
-    signal rd_a_data_valid         : std_logic;
-    signal rd_b_data_valid         : std_logic;
+    signal rd_data_valid_arr        : std_logic_vector(MFB_REGIONS - 1 downto 0);
+
+    -- Read enable per channel
+    signal rd_en_pch               : slv_array_t(MFB_REGIONS - 1 downto 0)(CHANNELS - 1 downto 0);
 
 begin
     -- =============================================================================================
@@ -129,7 +133,7 @@ begin
     -- =============================================================================================
 
     -- Meta array
-    pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
+    pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, MFB_REGIONS);
 
     -- Last SOF
     -- Higher takes
@@ -159,15 +163,16 @@ begin
         -- I think the EOF is not relevant at all 
 
         if (PCIE_MFB_SRC_RDY = '1') then
+            -- Address Increment
             -- +16
             addr_cntr_nst <= addr_cntr_pst + MFB_REGIONS*MFB_BLOCK_SIZE;
 
-            for i 0 to (MFB_REGIONS - 1) then 
+            for i in 0 to (MFB_REGIONS - 1) loop 
                 if (PCIE_MFB_SOF(i) = '1') then
                     -- +16 / +8
-                    addr_cntr_nst <= unsigned(pcie_mfb_meta_arr(0)(META_PCIE_ADDR)) + (MFB_REGIONS - i)*MFB_BLOCK_SIZE;
+                    addr_cntr_nst   <= unsigned(pcie_mfb_meta_arr(i)(META_PCIE_ADDR)) + (MFB_REGIONS - i)*MFB_BLOCK_SIZE;
                 end if;
-            end loop          
+            end loop;
         end if;
     end process;
 
@@ -364,11 +369,11 @@ begin
 
         -- Higher takes
         if (PCIE_MFB_SRC_RDY = '1') then 
-            for i 0 to (MFB_REGIONS - 1) then 
+            for i in 0 to (MFB_REGIONS - 1) loop 
                 if (PCIE_MFB_SOF(i) = '1') then
                     chan_num_nst <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
                 end if;
-            end loop           
+            end loop;
         end if;
     end process;
 
@@ -388,25 +393,25 @@ begin
     -- In the fourth case - First region takes actual value
     --                    - Second region takes actual value
 
-    -- Default: 
+    -- Default:
     wr_bram_data_demux_p : process (all) is
     begin
-        for i 0 to (MFB_REGIONS - 1) loop
+        for i in 0 to (MFB_REGIONS - 1) loop
             wr_be_bram_demux(i) <= (others => (others => '0'));
 
             if (PCIE_MFB_SRC_RDY = '1') then
                 -- Default: Stored value - combination 1) and 2)
-                wr_be_bram_demux(i)(to_integer(unsigned(chan_num_pst))) <= wr_be_bram_bshifter;
+                wr_be_bram_demux(i)(to_integer(unsigned(chan_num_pst))) <= wr_be_bram_bshifter(i);
 
                 if (PCIE_MFB_SOF(i) = '1') then
-                    wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
+                    wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) <= wr_be_bram_bshifter(i);
                 -- This seems strange, but in the second loop it will cover combination 3)
                 -- No effect in first loop
                 elsif (PCIE_MFB_SOF(0) = '1') then 
-                        wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(0)(META_CHAN_NUM)))) <= wr_be_bram_bshifter;
+                        wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(0)(META_CHAN_NUM)))) <= wr_be_bram_bshifter(i);
                 end if;
             end if;
-        end loop
+        end loop;
     end process;
 
     -- brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
@@ -507,56 +512,74 @@ begin
         end process;
     end generate;
 
+    -- Read enable - Write port priority
+    rd_en_ch_g : for j in 0 to (CHANNELS -1) generate
+        rd_en_reg_g : for i in 0 to (MFB_REGIONS - 1) generate
+            rd_en_p: process(all)
+            begin
+                -- Read enable per channel
+                rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not pcie_mfb_meta_arr(i)(META_BE)(0));
+            end process;
+        end generate;
+    end generate;
+
+
     -- =============================================================================================
     -- Dual port BRAM - 2 inputs
     -- =============================================================================================
     -- Note: One Channel
     -- Note: Connect Read Data to the output
-    tdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
-        tdp_bram_be_i : entity work.DP_BRAM_BEHAV
-            generic map (
-                DATA_WIDTH => 8;
-                ITEMS      => BUFFER_DEPTH;
-                OUTPUT_REG => FALSE;
-                -- What operation will be performed first when write and read are active
-                -- in same time and same port? Possible values are:
-                -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
-                -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
-                
-                RDW_MODE_A => "READ_FIRST";
-                RDW_MODE_B => "READ_FIRST"
-            );
-            port map (
-                CLK => CLK,
-                RST => RESET,
-                -- =======================================================================
-                -- Port A
-                -- =======================================================================
-                PIPE_ENA : in  std_logic;                                   -- Enable of port A and output register, required extra logic on Intel FPGA
-                REA      : in  std_logic;                                   -- Read enable of port A, only for generation DOA_DV
-                WEA      : in  std_logic;                                   -- Write enable of port A
-                ADDRA    => rw_addr_bram_by_mux(0)(i),
-                DIA      => wr_data_bram_bshifter(0)(i*8 +7 downto i*8),
-                DOA      => rd_data_bram(0)(i*8 +7 downto i*8),
-                DOA_DV   => rd_a_data_valid,
-                -- =======================================================================
-                -- Port B
-                -- =======================================================================
-                PIPE_ENB : in  std_logic;                                   -- Enable of port B and output register, required extra logic on Intel FPGA
-                REB      : in  std_logic;                                   -- Read enable of port B, only for generation DOB_DV
-                WEB      : in  std_logic;                                   -- Write enable of port B
-                ADDRB    => rw_addr_bram_by_mux(1)(i),
-                DIB      => wr_data_bram_bshifter(1)(i*8 +7 downto i*8),
-                DOB      => rd_data_bram(1)(i*8 +7 downto i*8),
-                DOB_DV   => rd_b_data_valid
-            );
+    -- Note: PIPE_EN can be or of wr_be_bram_demux and RD_EN
+    -- Note: RE => RD_EN - This has to be dependent on WE (priority) ... meaing META(BE(0))
+    -- Note: WE => wr_be_bram_demux
+    -- Note: Output data can be selected by DOX_DV
+
+    brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
+        tdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
+            tdp_bram_be_i : entity work.DP_BRAM_BEHAV
+                generic map (
+                    DATA_WIDTH => 8;
+                    ITEMS      => BUFFER_DEPTH;
+                    OUTPUT_REG => FALSE;
+                    -- What operation will be performed first when write and read are active
+                    -- in same time and same port? Possible values are:
+                    -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
+                    -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
+
+                    RDW_MODE_A => "READ_FIRST";
+                    RDW_MODE_B => "READ_FIRST"
+                );
+                port map (
+                    CLK => CLK,
+                    RST => RESET,
+                    -- =======================================================================
+                    -- Port A
+                    -- =======================================================================
+                    PIPE_ENA => '1',
+                    REA      => rd_en_pch(0)(j),
+                    WEA      => wr_be_bram_demux(0)(j)(i),
+                    ADDRA    => rw_addr_bram_by_mux(0)(i),
+                    DIA      => wr_data_bram_bshifter(0)(i*8 +7 downto i*8),
+                    DOA      => rd_data_bram(0)(j)(i*8 +7 downto i*8),
+                    DOA_DV   => rd_data_valid_arr(0),
+                    -- =======================================================================
+                    -- Port B
+                    -- =======================================================================
+                    PIPE_ENB => '1',
+                    REB      => rd_en_pch(1)(j),
+                    WEB      => wr_be_bram_demux(1)(j)(i),
+                    ADDRB    => rw_addr_bram_by_mux(1)(i),
+                    DIB      => wr_data_bram_bshifter(1)(i*8 +7 downto i*8),
+                    DOB      => rd_data_bram(1)(j)(i*8 +7 downto i*8),
+                    DOB_DV   => rd_data_valid_arr(1)
+                );
+        end generate;
     end generate;
 
-    -- =============================================================================================
-    -- End of Prototype
-    -- =============================================================================================     
-
-    rd_en_demux : process (all) is
+     -- =============================================================================================
+    -- Demulitplexors
+    -- =============================================================================================          
+    rd_en_demux: process (all) is
     begin
         rd_en_bram_demux <= (others => '0');
 
@@ -565,20 +588,30 @@ begin
         end if;
     end process;
 
-    rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)));
+    rd_data_demux: process(all)
+    begin 
+        rd_data_bram_mux    <= (others => '0');
+        RD_DATA_VLD         <= '0';
+        for i in 0 to MFB_REGIONS - 1  loop
+            if rd_data_valid_arr(i) = '1' then 
+                rd_data_bram_mux <= rd_data_bram(i)(to_integer(unsigned(RD_CHAN)));
+                RD_DATA_VLD      <= '1';
+            end if;
+        end loop;
+    end process;
 
     -- The Reading side is addressable by bytes so the number of blocks is 4 times more than on the
     -- reading side
     rd_data_barrel_shifter_i : entity work.BARREL_SHIFTER_GEN
         generic map (
-            BLOCKS     => 32,
+            BLOCKS     => MFB_BYTES,
             BLOCK_SIZE => 8,
             SHIFT_LEFT => FALSE
         )
         port map (
             DATA_IN  => rd_data_bram_mux,
             DATA_OUT => RD_DATA,
-            SEL      => RD_ADDR(4 downto 0)
+            SEL      => RD_ADDR(log2(MFB_BYTES) - 1 downto 0)
         );
 
     rd_addr_recalc_p : process (all) is
@@ -592,9 +625,7 @@ begin
         end loop;
     end process;
 
-
-    -- Output 
-    -- Note: One Channel
-    RD_DATA_VLD <= rd_a_data_valid or rd_b_data_valid;
-
+    -- =============================================================================================
+    -- End of Prototype
+    -- =============================================================================================     
 end architecture;
