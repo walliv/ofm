@@ -44,6 +44,8 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- Input MFB bus (quasi writing interface)
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
+        --(2*((1*8*32)/8 + log2(8) + 62 + 1)-1 downto 0)
+        -- 
         PCIE_MFB_META    : in  std_logic_vector(MFB_REGIONS*((MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
@@ -72,7 +74,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     -- Number of items in MFB word
     constant MFB_ITEMS    : natural := MFB_LENGTH/MFB_ITEM_WIDTH;
     -- Number of bytes in MFB word 
-    constant MFB_BYTES    : natural :=  MFB_LENGTH/8;
+    constant MFB_BYTES    : natural := MFB_LENGTH/8;
     -- The Address is restricted by BAR_APERTURE (IP_core setting)
     constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
 
@@ -82,7 +84,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     constant META_IS_DMA_HDR_W : natural := 1;
     constant META_PCIE_ADDR_W  : natural := 62;
     constant META_CHAN_NUM_W   : natural := log2(CHANNELS);
-    constant META_BE_W         : natural := MFB_LENGTH/8;
+    constant META_BE_W         : natural := (MFB_LENGTH/MFB_REGIONS)/8;
 
     constant META_IS_DMA_HDR_O : natural := 0;
     constant META_PCIE_ADDR_O  : natural := META_IS_DMA_HDR_O + META_IS_DMA_HDR_W;
@@ -111,7 +113,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     signal rd_en_bram_demux         : std_logic_vector(CHANNELS -1 downto 0);
     signal rd_data_bram_mux         : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal rd_data_bram             : slv_array_t(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
+    signal rd_data_bram             : slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
     signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
     -- 2 regions stuff
@@ -125,7 +127,9 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal rd_data_valid_arr        : std_logic_vector(MFB_REGIONS - 1 downto 0);
 
     -- Read enable per channel
-    signal rd_en_pch               : slv_array_t(MFB_REGIONS - 1 downto 0)(CHANNELS - 1 downto 0);
+    signal rd_en_pch                : slv_array_t(MFB_REGIONS - 1 downto 0)(CHANNELS - 1 downto 0);
+
+    signal pcie_meta_be             : std_logic_vector(MFB_LENGTH/8 - 1 downto 0);
 
 begin
     -- =============================================================================================
@@ -254,6 +258,9 @@ begin
     );        
 
     
+    -- The problem is that in metadata we only get half information 
+    pcie_meta_be    <= pcie_mfb_meta_arr(1)(META_BE) & pcie_mfb_meta_arr(0)(META_BE);
+
     -- Byte enable (first region) for port A
     wr_be_barrel_shifter_0_i : entity work.BARREL_SHIFTER_GEN
         generic map (
@@ -262,7 +269,7 @@ begin
             SHIFT_LEFT => TRUE
         )
         port map (
-            DATA_IN  => pcie_mfb_meta_arr(0)(META_BE),
+            DATA_IN  => pcie_meta_be,
             DATA_OUT => wr_be_bram_bshifter(0),
             SEL      => wr_shift_sel(0)
         );
@@ -275,7 +282,7 @@ begin
             SHIFT_LEFT => TRUE
         )
         port map (
-            DATA_IN  => pcie_mfb_meta_arr(1)(META_BE),
+            DATA_IN  => pcie_meta_be,
             DATA_OUT => wr_be_bram_bshifter(1),
             SEL      => wr_shift_sel(1)
         );
@@ -306,7 +313,8 @@ begin
 
         -- This has been added to ensure looping compatibility
         -- Combination 1) and 2) for first region
-        pcie_mfb_meta_addr_v(0) := std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_ITEMS) -1 downto log2(MFB_ITEMS)));
+        -- This is not correct usage of this signal
+        pcie_mfb_meta_addr_v(0) := std_logic_vector(addr_cntr_pst);
 
         -- Don't ask what is happening here. I don't know
         for j in 0 to MFB_REGIONS - 1 loop
@@ -489,7 +497,7 @@ begin
         addr_trim_p: process(all) 
         begin
             for j in 0 to ((MFB_LENGTH/8) -1) loop
-                wr_addr_bram_by_trim(i)(j) <= wr_addr_bram_by_shift(j/4);
+                wr_addr_bram_by_trim(i)(j) <= wr_addr_bram_by_shift(i)(j/4);
             end loop;
         end process;
     end generate;
@@ -503,7 +511,7 @@ begin
             
             if (PCIE_MFB_SRC_RDY = '1') then
                 -- The first bit Byte Enable is enough to decide
-                if (pcie_mfb_meta_arr(i)(META_BE)(0) ='1') then
+                if (pcie_mfb_meta_arr(i)(META_BE_O) = '1') then
                     rw_addr_bram_by_mux(i) <= wr_addr_bram_by_trim(i);
                 else
                     rw_addr_bram_by_mux(i) <= rd_addr_bram_by_shift;
@@ -518,7 +526,7 @@ begin
             rd_en_p: process(all)
             begin
                 -- Read enable per channel
-                rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not pcie_mfb_meta_arr(i)(META_BE)(0));
+                rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not pcie_mfb_meta_arr(i)(META_BE_O));
             end process;
         end generate;
     end generate;
@@ -538,17 +546,17 @@ begin
         tdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
             tdp_bram_be_i : entity work.DP_BRAM_BEHAV
                 generic map (
-                    DATA_WIDTH => 8;
-                    ITEMS      => BUFFER_DEPTH;
-                    OUTPUT_REG => FALSE;
+                    DATA_WIDTH => 8,
+                    ITEMS      => BUFFER_DEPTH,
+                    OUTPUT_REG => FALSE,
                     -- What operation will be performed first when write and read are active
                     -- in same time and same port? Possible values are:
                     -- "WRITE_FIRST" - Default mode, works on Xilinx and Intel FPGAs.
                     -- "READ_FIRST"  - This mode is not supported on Intel FPGAs, BRAM will be implemented into logic!
 
-                    RDW_MODE_A => "READ_FIRST";
-                    RDW_MODE_B => "READ_FIRST"
-                );
+                    RDW_MODE_A => "WRITE_FIRST",
+                    RDW_MODE_B => "WRITE_FIRST"
+                )
                 port map (
                     CLK => CLK,
                     RST => RESET,
@@ -561,7 +569,7 @@ begin
                     ADDRA    => rw_addr_bram_by_mux(0)(i),
                     DIA      => wr_data_bram_bshifter(0)(i*8 +7 downto i*8),
                     DOA      => rd_data_bram(0)(j)(i*8 +7 downto i*8),
-                    DOA_DV   => rd_data_valid_arr(0),
+                    DOA_DV   => open,
                     -- =======================================================================
                     -- Port B
                     -- =======================================================================
@@ -571,11 +579,24 @@ begin
                     ADDRB    => rw_addr_bram_by_mux(1)(i),
                     DIB      => wr_data_bram_bshifter(1)(i*8 +7 downto i*8),
                     DOB      => rd_data_bram(1)(j)(i*8 +7 downto i*8),
-                    DOB_DV   => rd_data_valid_arr(1)
+                    DOB_DV   => open
                 );
         end generate;
     end generate;
-
+    
+    rd_vld_p: process(CLK)
+    begin
+        if rising_edge(CLK) then
+            rd_data_valid_arr   <= (others => '0');
+            for j in 0 to MFB_REGIONS - 1 loop
+                for i in 0 to CHANNELS - 1 loop
+                    if rd_en_pch(j)(i) = '1' then 
+                        rd_data_valid_arr(j) <= '1';
+                    end if;
+                end loop;
+            end loop;
+        end if;
+    end process;
      -- =============================================================================================
     -- Demulitplexors
     -- =============================================================================================          
@@ -625,7 +646,4 @@ begin
         end loop;
     end process;
 
-    -- =============================================================================================
-    -- End of Prototype
-    -- =============================================================================================     
 end architecture;
