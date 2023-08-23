@@ -1,6 +1,7 @@
 -- tx_dma_pcie_trans_buffer.vhd: this is a specially made component to buffer PCIe transactions
 -- Copyright (C) 2023 CESNET z.s.p.o.
 -- Author(s): Vladislav Valek  <xvalek14@vutbr.cz>
+--            David Benes      <xbenes52@vutbr.cz> 
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 
@@ -9,11 +10,6 @@ use IEEE.std_logic_1164.all;
 use IEEE.numeric_std.all;
 
 -- Note:
--- Todo: Registers befora BRAM 
---       WNS: 1.5ns
---       BE logic is not correct at this time
---       Writing to the second port only when there's SOF in second region
-
 use work.math_pack.all;
 use work.type_pack.all;
 
@@ -32,7 +28,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- =========================================================================================
         -- Input PCIe interface parameters
         -- =========================================================================================
-        MFB_REGIONS     : natural := 2;
+        MFB_REGIONS     : natural := 1;
         MFB_REGION_SIZE : natural := 1;
         MFB_BLOCK_SIZE  : natural := 8;
         MFB_ITEM_WIDTH  : natural := 32;
@@ -48,8 +44,6 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- Input MFB bus (quasi writing interface)
         -- =========================================================================================
         PCIE_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-        --(2*((1*8*32)/8 + log2(8) + 62 + 1)-1 downto 0)
-        -- 
         PCIE_MFB_META    : in  std_logic_vector(MFB_REGIONS*((MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
         PCIE_MFB_EOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
@@ -149,10 +143,12 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal wr_data_bram_reg_num     : slv_array_2d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
     -- Input register
-    signal pcie_mfb_data_reg_num      : slv_array_t(REG_NUM downto 0)(PCIE_MFB_DATA'range);
-    signal pcie_mfb_meta_reg_num      : slv_array_t(REG_NUM downto 0)(PCIE_MFB_META'range);
-    signal pcie_mfb_sof_reg_num       : slv_array_t(REG_NUM downto 0)(PCIE_MFB_SOF'range);
-    signal pcie_mfb_src_rdy_reg_num   : std_logic_vector(REG_NUM downto 0);
+    signal pcie_mfb_data_reg_num    : slv_array_t(REG_NUM downto 0)(PCIE_MFB_DATA'range);
+    signal pcie_mfb_meta_reg_num    : slv_array_t(REG_NUM downto 0)(PCIE_MFB_META'range);
+    signal pcie_mfb_sof_reg_num     : slv_array_t(REG_NUM downto 0)(PCIE_MFB_SOF'range);
+    signal pcie_mfb_src_rdy_reg_num : std_logic_vector(REG_NUM downto 0);
+
+    signal addr_sel                 : std_logic_vector(MFB_REGIONS - 1 downto 0);
 
 begin
     -- =============================================================================================
@@ -549,9 +545,13 @@ begin
             end process;
         end generate;
 
+        -- Address Select 
+        -- First port controlled by Byte Enable
+        -- Second port is controlled by second region SOF
+        addr_sel(0) <= pcie_mfb_meta_arr(0)(META_BE_O);
+        addr_sel(1) <= pcie_mfb_sof_reg_num(REG_NUM)(1);
+        
         -- The Address Multiplexer - Choose between PCIe and Read Port
-        -- Well this is not correct - The select signal must be something else 
-        -- Now it supports old design (unacceptable)
         addr_mux_p : for i in 0 to MFB_REGIONS - 1 generate
             addr_mux_p: process(all)
             begin
@@ -560,7 +560,7 @@ begin
                 
                 if (pcie_mfb_src_rdy_reg_num(REG_NUM) = '1') then
                     -- The first bit Byte Enable is enough to decide whether read to write
-                    if (pcie_mfb_meta_arr(i)(META_BE_O) = '1') then
+                    if (addr_sel(i) = '1') then
                         rw_addr_bram_by_mux(i) <= wr_addr_bram_by_multi(i);
                     else
                         rw_addr_bram_by_mux(i) <= rd_addr_bram_by_shift;
@@ -575,7 +575,7 @@ begin
                 rd_en_p: process(all)
                 begin
                     -- Read enable per channel
-                    rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not pcie_mfb_meta_arr(i)(META_BE_O));
+                    rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not addr_sel(i));
                 end process;
             end generate;
         end generate;
@@ -651,7 +651,7 @@ begin
     end process;
 
     rd_data_demux_g: if (MFB_REGIONS = 1) generate
-        RD_DATA_VLD         <= '1';
+        RD_DATA_VLD      <= '1';
         rd_data_bram_mux <= rd_data_bram(0)(to_integer(unsigned(RD_CHAN)));
     else generate
         rd_data_demux_p: process(all)
@@ -683,11 +683,11 @@ begin
 
     rd_addr_recalc_p : process (all) is
     begin
-        rd_addr_bram_by_shift <= (others => RD_ADDR(log2(BUFFER_DEPTH)+5 -1 downto 5));
+        rd_addr_bram_by_shift <= (others => RD_ADDR(log2(BUFFER_DEPTH)+log2(MFB_BYTES) -1 downto log2(MFB_BYTES)));
 
         for i in 0 to ((MFB_LENGTH/8) -1) loop
-            if (i < unsigned(RD_ADDR(4 downto 0))) then
-                rd_addr_bram_by_shift(i) <= std_logic_vector(unsigned(RD_ADDR(log2(BUFFER_DEPTH)+5 -1 downto 5)) + 1);
+            if (i < unsigned(RD_ADDR(log2(MFB_BYTES) - 1 downto 0))) then
+                rd_addr_bram_by_shift(i) <= std_logic_vector(unsigned(RD_ADDR(log2(BUFFER_DEPTH) + log2(MFB_BYTES) -1 downto log2(MFB_BYTES))) + 1);
             end if;
         end loop;
     end process;
