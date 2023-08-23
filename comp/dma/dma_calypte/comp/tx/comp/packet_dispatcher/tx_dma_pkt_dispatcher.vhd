@@ -29,9 +29,9 @@ entity TX_DMA_PKT_DISPATCHER is
         PKT_SIZE_MAX   : natural := 2**16 -1;
 
         MFB_REGIONS     : natural := 1;
-        MFB_REGION_SIZE : natural := 1;
+        MFB_REGION_SIZE : natural := 8; -- 4/8
         MFB_BLOCK_SIZE  : natural := 8;
-        MFB_ITEM_WIDTH  : natural := 32;
+        MFB_ITEM_WIDTH  : natural := 8;
 
         DATA_POINTER_WIDTH    : natural := 16;
         DMA_HDR_POINTER_WIDTH : natural := 9);
@@ -91,7 +91,7 @@ entity TX_DMA_PKT_DISPATCHER is
         UPD_HHP_CHAN : out std_logic_vector(log2(CHANNELS) -1 downto 0);
         UPD_HHP_DATA : out std_logic_vector(DMA_HDR_POINTER_WIDTH -1 downto 0);
         UPD_HHP_EN   : out std_logic
-        );
+    );
 end entity;
 
 architecture FULL of TX_DMA_PKT_DISPATCHER is

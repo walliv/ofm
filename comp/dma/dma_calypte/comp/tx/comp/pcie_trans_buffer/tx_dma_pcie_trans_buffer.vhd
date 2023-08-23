@@ -28,7 +28,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         -- =========================================================================================
         -- Input PCIe interface parameters
         -- =========================================================================================
-        MFB_REGIONS     : natural := 1;
+        MFB_REGIONS     : natural := 2;
         MFB_REGION_SIZE : natural := 1;
         MFB_BLOCK_SIZE  : natural := 8;
         MFB_ITEM_WIDTH  : natural := 32;
@@ -76,7 +76,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     -- The Address is restricted by BAR_APERTURE (IP_core setting)
     constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
     -- Number of shift-registers
-    constant REG_NUM      : natural := 2;
+    constant REG_NUM      : natural := 4;
 
     -- =============================================================================================
     -- Defining ranges for meta signal
