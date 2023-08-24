@@ -63,8 +63,8 @@ entity TX_DMA_METADATA_EXTRACTOR is
         -- Byte enable for every MFB word where frame is transmitted. Calculated from Byte Enable
         -- signals of the PCIe transaction.
         USR_MFB_META_BYTE_EN    : out std_logic_vector((PCIE_MFB_REGIONS*PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8 -1 downto 0);
-        -- Size of current transaction in bytes
-        USR_MFB_META_BYTE_CNT    : out std_logic_vector(13 -1 downto 0);
+        -- Size of current transaction in bytes - per region
+        USR_MFB_META_BYTE_CNT    : out std_logic_vector(PCIE_MFB_REGIONS*13 -1 downto 0);
         -- Address length type, supported are:
         -- 1 - 64-DW address
         -- 0 - 32-DW address
@@ -184,6 +184,7 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal usr_mfb_meta_pcie_addr_arr       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(62 -1 downto 0);
     signal usr_mfb_meta_chan_num_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(log2(CHANNELS) - 1 downto 0);
     signal usr_mfb_meta_addr_len_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(0 downto 0);
+    signal usr_mfb_meta_byte_cnt_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(13 - 1 downto 0);
 
 begin
     -- ============================================================================================
@@ -276,13 +277,8 @@ begin
             if PCIE_MFB_SRC_RDY = '1' then 
                 if PCIE_MFB_SOF(i) = '1' then
                     -- Base address of the first DMA header buffer is always larger by one than the last
-<<<<<<< HEAD
                     -- addres for a data buffer in a last channel
                     is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1);
-=======
-                    -- address for a data buffer in a last channel
-                    is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH);
->>>>>>> f4ec84d0 (tx_dma_calypte [WIP]: Backup - add support for second region in channel control)
 
                     -- select only the part of the address which indexes DMA channels
                     chan_num_int(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
@@ -452,6 +448,7 @@ begin
         usr_mfb_meta_is_dma_hdr_arr(i)     <= aux_mfb_meta_arr(i)(META_IS_DMA_HDR);
         usr_mfb_meta_pcie_addr_arr(i)      <= aux_mfb_meta_arr(i)(META_PCIE_ADDR);
         usr_mfb_meta_chan_num_arr(i)       <= aux_mfb_meta_arr(i)(META_CHAN_NUM);
+        usr_mfb_meta_byte_cnt_arr(i)       <= aux_mfb_meta_arr(i)(META_BYTE_CNT);
         usr_mfb_meta_addr_len_arr(i)       <= aux_mfb_meta_arr(i)(META_ADDR_LEN);
     end generate;
 
@@ -459,7 +456,7 @@ begin
     USR_MFB_META_PCIE_ADDR  <= slv_array_ser(usr_mfb_meta_pcie_addr_arr);
     USR_MFB_META_CHAN_NUM   <= slv_array_ser(usr_mfb_meta_chan_num_arr);
     USR_MFB_META_BYTE_EN    <= slv_array_2d_ser(mfb_aux_item_be);
-    USR_MFB_META_BYTE_CNT   <= slv_array_ser(aux_mfb_meta(META_BYTE_CNT));
+    USR_MFB_META_BYTE_CNT   <= slv_array_ser(usr_mfb_meta_byte_cnt_arr);
     USR_MFB_META_ADDR_LEN   <= slv_array_ser(usr_mfb_meta_addr_len_arr);
 
     USR_MFB_DATA    <= aux_mfb_data;
