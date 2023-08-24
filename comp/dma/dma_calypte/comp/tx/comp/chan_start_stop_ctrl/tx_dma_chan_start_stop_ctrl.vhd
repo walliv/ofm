@@ -47,8 +47,8 @@ entity TX_DMA_CHAN_START_STOP_CTRL is
         -- Largest packet (in bytes) which can come out of USR_MFB interface
         PKT_SIZE_MAX : natural := 2**16 - 1;
 
-        DBG_SIGNAL_WIDTH : natural := 2
-        );
+        DBG_SIGNAL_WIDTH : natural := 4
+    );
     port (
         CLK   : in std_logic;
         RESET : in std_logic;
@@ -99,7 +99,7 @@ entity TX_DMA_CHAN_START_STOP_CTRL is
         -- =========================================================================================
         ST_SP_DBG_CHAN : out std_logic_vector(log2(CHANNELS) -1 downto 0);
         ST_SP_DBG_META : out std_logic_vector(DBG_SIGNAL_WIDTH -1 downto 0)
-        );
+    );
 end entity;
 
 architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
@@ -150,7 +150,7 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- MUXed from all channels
     signal pkt_drop_en              : std_logic_vector(PCIE_MFB_REGIONS -1 downto 0);
 
-<<<<<<< HEAD
+
     -- =============================================================================================
     -- All things debugging
     -- =============================================================================================
@@ -191,21 +191,16 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     -- attribute mark_debug of stop_req_while_pending_ored : signal is "true";
 
     -- attribute mark_debug of ST_SP_DBG_META : signal is "true";
-    -- ========================
-    -- David's playground
-    -- ========================
+
+    -- =============================================================================================
+    -- Two regions support
+    -- =============================================================================================
     -- This signal is telling us, when the State should change
-=======
     -- is_dma_hdr per region
-<<<<<<< HEAD
->>>>>>> 7c02ec17 (tx_dma_calypte [WIP]: Add support for two regions)
     signal is_dma_hdr_arr       : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
-=======
-    signal is_dma_hdr_arr           : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
->>>>>>> aa6e5963 (tx_dma_calypte [WIP]: Clean code)
 
     -- Divide meta signal for better usage
-    signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
+    signal pcie_mfb_meta_arr        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(13 + (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1-1 downto 0);
 
     -- SOF for specific channel
     signal pcie_mfb_sof_arr         : slv_array_t(CHANNELS - 1 downto 0)(PCIE_MFB_REGIONS - 1 downto 0);
@@ -220,12 +215,16 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     signal fifox_mult_empty         : std_logic_vector(0 downto 0);
 
     -- Verification 
-    signal fifox_mult_full          : std_logic;
-    signal fifo_full_reg            : std_logic;
+    signal fifox_mult_full          : std_logic := '0';
+    signal fifo_full_reg            : std_logic := '0';
+
+    -- Meta extraction
+    signal pcie_mfb_meta_ext        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_BE_O + META_BE_W -1 downto 0);
 
 begin
     assert (fifo_full_reg = '0') report "TX_DMA_CHAN_START_STOP_CTRL: FIFOX_MULTI OVERFLOW!" severity Failure;
 
+    -- Debug signal for one region
     stop_req_while_pending_ored <= or stop_req_while_pending;
     meta_is_dma_hdr_int         <= PCIE_MFB_META(META_IS_DMA_HDR);
     meta_pcie_addr_int          <= PCIE_MFB_META(META_PCIE_ADDR);
@@ -516,94 +515,95 @@ begin
             end process;
         end generate;
     end generate;
-<<<<<<< HEAD
 
-    ST_SP_DBG_CHAN    <= PCIE_MFB_META(META_CHAN_NUM);
-    ST_SP_DBG_META(0) <= (or dma_hdr_out_of_order_chan);
-    ST_SP_DBG_META(1) <= '1' when (PCIE_MFB_SRC_RDY = '1' and PCIE_MFB_DST_RDY = '1' and PCIE_MFB_SOF = "1" and PCIE_MFB_META(META_IS_DMA_HDR) = "1") else '0';
-    ST_SP_DBG_META(2) <= (or dma_frame_lng_correct) and PCIE_MFB_DST_RDY;
-    ST_SP_DBG_META(3) <= (or dma_frame_lng_incorrect) and PCIE_MFB_DST_RDY;
+    -- One region debug (The "PCIE_MFB_SOF = "1"" is not that compatible)
+    pkt_statistics_g: if PCIE_MFB_REGIONS = 1 generate
+        ST_SP_DBG_CHAN    <= PCIE_MFB_META(META_CHAN_NUM);
+        ST_SP_DBG_META(0) <= (or dma_hdr_out_of_order_chan);
+        ST_SP_DBG_META(1) <= '1' when (PCIE_MFB_SRC_RDY = '1' and PCIE_MFB_DST_RDY = '1' and PCIE_MFB_SOF = "1" and PCIE_MFB_META(META_IS_DMA_HDR) = "1") else '0';
+        ST_SP_DBG_META(2) <= (or dma_frame_lng_correct) and PCIE_MFB_DST_RDY;
+        ST_SP_DBG_META(3) <= (or dma_frame_lng_incorrect) and PCIE_MFB_DST_RDY;
 
-    PKT_DISC_CHAN  <= PCIE_MFB_META(META_CHAN_NUM);
-    -- choose only packet size from the DMA header
-    PKT_DISC_BYTES <= PCIE_MFB_DATA(log2(PKT_SIZE_MAX+1) -1 downto 0);
-    PKT_DISC_INC   <= '1' when
-                    (
-                        pkt_acc_pst(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM)))) = S_PKT_DROP
-                        and PCIE_MFB_META(META_IS_DMA_HDR) = "1"
-                        and PCIE_MFB_SRC_RDY = '1'
-                        and PCIE_MFB_DST_RDY = '1')
-                    else '0';
-=======
+        PKT_DISC_CHAN  <= PCIE_MFB_META(META_CHAN_NUM);
+        -- choose only packet size from the DMA header
+        PKT_DISC_BYTES <= PCIE_MFB_DATA(log2(PKT_SIZE_MAX+1) -1 downto 0);
+        PKT_DISC_INC   <= '1' when
+                        (
+                            pkt_acc_pst(to_integer(unsigned(PCIE_MFB_META(META_CHAN_NUM)))) = S_PKT_DROP
+                            and PCIE_MFB_META(META_IS_DMA_HDR) = "1"
+                            and PCIE_MFB_SRC_RDY = '1'
+                            and PCIE_MFB_DST_RDY = '1')
+                        else '0';
+    else generate
+        -- Extract data for statistics
+        -- This part should be compatible with one region as well
+        pcie_mfb_data_arr   <= slv_array_deser(PCIE_MFB_DATA, PCIE_MFB_REGIONS);
+        discard_arr_p: process(all)
+        begin
+            for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+                pcie_mfb_disc_chan_arr(i)   <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
+                pcie_mfb_disc_bytes_arr(i)  <= pcie_mfb_data_arr(i)(log2(PKT_SIZE_MAX+1) -1 downto 0);
+
+                pcie_mfb_disc_inc_arr(i)    <= '0';
+                if (pkt_acc_pst(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) = S_PKT_DROP
+                    and pcie_mfb_meta_arr(i)(META_IS_DMA_HDR)(0) = '1'
+                    and PCIE_MFB_SRC_RDY = '1'
+                    and PCIE_MFB_DST_RDY = '1') then
+                    pcie_mfb_disc_inc_arr(i)   <= '1';
+                end if;
+            end loop;
+        end process;
+
+        -- Concatenate statistical data
+        var_conc_p: process(all)
+        begin 
+            for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+                fifox_mult_di(i) <= pcie_mfb_disc_chan_arr(i) & pcie_mfb_disc_bytes_arr(i) & pcie_mfb_disc_inc_arr(i);
+            end loop;
+        end process;
         
-    -- Extract data for statistics
-    pcie_mfb_data_arr   <= slv_array_deser(PCIE_MFB_DATA, PCIE_MFB_REGIONS);
-    discard_arr_p: process(all)
-    begin
-        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
-            pcie_mfb_disc_chan_arr(i)   <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
-            pcie_mfb_disc_bytes_arr(i)  <= pcie_mfb_data_arr(i)(log2(PKT_SIZE_MAX+1) -1 downto 0);
+        -- FIFOX MULTI: (2 to 1) or (1 to 1)
+        overflow_fifox_i: entity work.FIFOX_MULTI
+        generic map(
+            DATA_WIDTH      => log2(CHANNELS) + log2(PKT_SIZE_MAX+1) + 1,
+            ITEMS           => CHANNELS*2,
+            WRITE_PORTS     => PCIE_MFB_REGIONS,
+            READ_PORTS      => 1,
+            DEVICE          => DEVICE
+        )
+        port map (
+            CLK     => CLK,
+            RESET   => RESET,
 
-            pcie_mfb_disc_inc_arr(i)    <= '0';
-            if (pkt_acc_pst(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) = S_PKT_DROP
-                and pcie_mfb_meta_arr(i)(META_IS_DMA_HDR)(0) = '1'
-                and PCIE_MFB_SRC_RDY = '1'
-                and PCIE_MFB_DST_RDY = '1') then
-                pcie_mfb_disc_inc_arr(i)   <= '1';
+            DI      => slv_array_ser(fifox_mult_di),
+            WR      => pcie_mfb_disc_inc_arr,
+            FULL    => fifox_mult_full,
+            AFULL   => open,
+        
+            DO      => fifox_mult_do,
+            RD      => "1",
+            EMPTY   => fifox_mult_empty,
+            AEMPTY  => open
+        );
+
+        disc_out_p: process(all)
+        begin
+            if fifox_mult_empty = "0" then 
+                (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
+            else 
+                (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
+                PKT_DISC_INC    <= '0';
             end if;
-        end loop;
-    end process;
+        end process;
 
-    -- Concatenate statistical data
-    var_conc_p: process(all)
-    begin 
-        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
-            fifox_mult_di(i) <= pcie_mfb_disc_chan_arr(i) & pcie_mfb_disc_bytes_arr(i) & pcie_mfb_disc_inc_arr(i);
-        end loop;
-    end process;
-    
-    -- FIFOX MULTI: (2 to 1) or (1 to 1)
-    overflow_fifox_i: entity work.FIFOX_MULTI
-    generic map(
-        DATA_WIDTH      => log2(CHANNELS) + log2(PKT_SIZE_MAX+1) + 1,
-        ITEMS           => CHANNELS*2,
-        WRITE_PORTS     => PCIE_MFB_REGIONS,
-        READ_PORTS      => 1,
-        DEVICE          => DEVICE
-     )
-     port map (
-        CLK     => CLK,
-        RESET   => RESET,
-
-        DI      => slv_array_ser(fifox_mult_di),
-        WR      => pcie_mfb_disc_inc_arr,
-        FULL    => fifox_mult_full,
-        AFULL   => open,
-    
-        DO      => fifox_mult_do,
-        RD      => "1",
-        EMPTY   => fifox_mult_empty,
-        AEMPTY  => open
-    );
-
-    disc_out_p: process(all)
-    begin
-        if fifox_mult_empty = "0" then 
-            (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
-        else 
-            (PKT_DISC_CHAN, PKT_DISC_BYTES, PKT_DISC_INC) <= fifox_mult_do;
-            PKT_DISC_INC    <= '0';
-        end if;
-    end process;
-
-    -- Signal for verfication
-    ver_reg_p: process(CLK)
-    begin
-        if rising_edge(CLK) then 
-            fifo_full_reg <= fifox_mult_full;
-        end if;
-    end process;
->>>>>>> 7c02ec17 (tx_dma_calypte [WIP]: Add support for two regions)
+        -- Signal for verfication
+        ver_reg_p: process(CLK)
+        begin
+            if rising_edge(CLK) then 
+                fifo_full_reg <= fifox_mult_full;
+            end if;
+        end process;
+    end generate;
 
     -- =============================================================================================
     -- Packet droping
@@ -618,24 +618,28 @@ begin
         end loop;
     end process;
 
+    -- Extract usefull data 
+    byte_cnt_ext_p: process(all)
+    begin
+        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
+            pcie_mfb_meta_ext(i)   <= pcie_mfb_meta_arr(i)(META_BE_O + META_BE_W -1 downto 0);
+        end loop;
+    end process;
+
     pkt_dropper_i : entity work.MFB_DROPPER
         generic map (
             REGIONS     => PCIE_MFB_REGIONS,
             REGION_SIZE => PCIE_MFB_REGION_SIZE,
             BLOCK_SIZE  => PCIE_MFB_BLOCK_SIZE,
             ITEM_WIDTH  => PCIE_MFB_ITEM_WIDTH,
-<<<<<<< HEAD
-            META_WIDTH  => ((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)  --PCIE_MFB_META'length
-=======
             META_WIDTH  => ((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)
->>>>>>> aa6e5963 (tx_dma_calypte [WIP]: Clean code)
         )
         port map (
             CLK   => CLK,
             RESET => RESET,
 
             RX_DATA    => PCIE_MFB_DATA,
-            RX_META    => PCIE_MFB_META(META_BE_O + META_BE_W -1 downto 0),
+            RX_META    => slv_array_ser(pcie_mfb_meta_ext),
             RX_SOF_POS => PCIE_MFB_SOF_POS,
             RX_EOF_POS => PCIE_MFB_EOF_POS,
             RX_SOF     => PCIE_MFB_SOF,
