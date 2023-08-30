@@ -116,17 +116,9 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     signal byte_cntr_q    : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
 
     -- Read FSM
-    type rd_fsm_state_t is (S_IDLE, S_WR_BUFF, S_RD_BUFF);
-    signal rd_fsm_pst : rd_fsm_state_t := S_IDLE;
-    signal rd_fsm_nst : rd_fsm_state_t := S_IDLE;
-
-    type out_fsm_state_t is (S_IDLE, S_WR_BUFF_OUT, S_RD_BUFF_OUT, S_UPDATE_STATUS);
-    signal out_fsm_pst : out_fsm_state_t := S_IDLE;
-    signal out_fsm_nst : out_fsm_state_t := S_IDLE;
-
-    type pkt_dispatch_state_t is (S_IDLE, S_PKT_MIDDLE, S_UPDATE_STATUS);
-    signal pkt_dispatch_pst : pkt_dispatch_state_t := S_IDLE;
-    signal pkt_dispatch_nst : pkt_dispatch_state_t := S_IDLE;
+    type ctrl_fsm_state_t is (S_IDLE, S_WR_BUFF, S_RD_BUFF, S_UPDATE_STATUS);
+    signal ctrl_fsm_pst : ctrl_fsm_state_t := S_IDLE;
+    signal ctrl_fsm_nst : ctrl_fsm_state_t := S_IDLE;
 
     signal disp_fsm_mfb_sof     : std_logic_vector(USR_MFB_SOF'range);
     signal disp_fsm_mfb_eof     : std_logic_vector(USR_MFB_EOF'range);
@@ -167,62 +159,104 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     
 begin
     -- =============================================================================================
-    -- RD_FSM - Read State Machine
+    -- CFSM - Control State Machine
     -- =============================================================================================
+    -- This state machine controls the flow of data through the FIFO to the output
 
     rd_fsm_reg_p : process (CLK) is
     begin
         if (rising_edge(CLK)) then
             if (RESET = '1') then
-                rd_fsm_pst      <= S_IDLE;
+                ctrl_fsm_pst    <= S_IDLE;
                 next_addr_q     <= (others => '0');
                 current_addr_q  <= (others => '0');
-                byte_cntr_q     <= (others => '0');                
+                byte_cntr_q     <= (others => '0');   
+                out_meta_chan_q <= (others => '0');
+                out_meta_data_q <= (others => '0');
             else
-                rd_fsm_pst      <= rd_fsm_pst_nst;
+                ctrl_fsm_pst    <= ctrl_fsm_nst;
                 next_addr_q     <= next_addr_d;
                 current_addr_q  <= current_addr_d;
                 byte_cntr_q     <= byte_cntr_d;
+                out_meta_chan_q <= out_meta_chan_d;
+                out_meta_data_q <= out_meta_data_d;
             end if;
         end if;
-    end process
+    end process;
 
-    -- Note: RD_DATA_VLD is not considered
-    rd_fsm_nst_logic_p : process (all) is
+    -- =============================================================================================
+    -- Transition logic of FSM
+    -- =============================================================================================
+    fsm_transition_logic_p: process (all) is
+    begin
+        ctrl_fsm_nst <= ctrl_fsm_pst;
+
+        case ctrl_fsm_pst is 
+
+            -- Valid DMA header is received
+            when S_IDLE             =>
+                if (HDR_BUFF_SRC_RDY = '1') then  
+                    if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
+                        ctrl_fsm_nst <= S_WR_BUFF;
+                    end if;
+                end if;
+
+            -- Last part of the packet is received
+            when S_WR_BUFF          =>
+                if (BUFF_RD_DATA_VLD = '1') then 
+                    if (byte_cntr_q <= (USR_MFB_DATA'length /8)) then
+                        ctrl_fsm_nst  <= S_RD_BUFF;
+                    end if;
+                end if;
+
+            -- The buffer that held the packet is empty
+            when S_RD_BUFF          =>
+                if (disp_buffer_aempty = '1') then
+                    ctrl_fsm_nst <= S_UPDATE_STATUS;
+                end if;
+
+            -- Time to update statistics
+            when S_UPDATE_STATUS    =>
+                ctrl_fsm_nst    <= S_IDLE;
+
+        end case;
+    end process;
+
+    -- =============================================================================================
+    -- Read from Buffer
+    -- =============================================================================================
+    rd_fsm_logic_p : process (all) is
         variable dma_hdr_frame_ptr_v    : unsigned(DMA_FRAME_PTR_W -1 downto 0);
         variable dma_hdr_frame_length_v : unsigned(DMA_FRAME_LENGTH_W -1 downto 0);
     begin
-        rd_fsm_pst_nst  <= rd_fsm_pst;
-        next_addr_d     <= next_addr_q;
-        current_addr_d  <= current_addr_q;
-        byte_cntr_d     <= byte_cntr_q;
-
         dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
-        dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH)); 
+        dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
 
-        rd_fsm_sof      <= (others => '0');
-        rd_fsm_eof      <= (others => '0');
-        rd_fsm_sof_pos  <= (others => '0'); -- ok
-        rd_fsm_eof_pos  <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+        -- Address ctrl
+        next_addr_d         <= next_addr_q;
+        current_addr_d      <= current_addr_q;
+        byte_cntr_d         <= byte_cntr_q;
 
-        -- PCIe buffer ctrl
-        BUFF_RD_ADDR    <= (others => '0');
-        BUFF_RD_EN      <= '0';
+        -- USR_MFB
+        rd_fsm_sof          <= (others => '0');
+        rd_fsm_eof          <= (others => '0');
+        rd_fsm_sof_pos      <= (others => '0');
+        rd_fsm_eof_pos      <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+
+        -- PCIe Buffer
+        BUFF_RD_ADDR        <= (others => '0');
+        BUFF_RD_EN          <= '0';
+        BUFF_RD_CHAN        <= HDR_BUFF_CHAN;
+
 
         HDR_BUFF_DST_RDY    <= '0';
 
-        -- Note: After RD_EN is set, the RD_DATA_VLD signal will be high next clock
-        -- If not, the address and enable has to be high as long as RD_DATA_VLD
-        -- It seems that in the new design there must be next_addr (done) and current_addr
-        -- The next_addr will be used when RD_DATA_VLD is high
-        -- The current_addr will be used when RD_DATA_VLD is low (we wait in case both ports in the buffer are in use)
-        case rd_fsm_pst is
-            when S_IDLE     =>
-                if (HDR_BUFF_SRC_RDY = '1' then  
+        -- Note: If RD_EN is set, the address must be valid until RD_DATA_VLD occurs
+        case ctrl_fsm_pst is
+            when S_IDLE             =>
+                if (HDR_BUFF_SRC_RDY = '1') then
                     -- Accept DMA header
-                    if ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
-                        rd_fsm_nst <= S_WR_BUFF;
-                        
+                    if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
                         -- Save address and byte lenght of incoming packet
                         next_addr_d      <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range) + (USR_MFB_DATA'length /8);
                         current_addr_d   <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
@@ -239,7 +273,7 @@ begin
                 end if;
             
             -- Write data to the FIFO based on DMA_HDR information
-            when S_WR_BUFF  =>
+            when S_WR_BUFF          =>
                 -- Request Buffer
                 BUFF_RD_ADDR    <= std_logic_vector(current_addr_q);
                 BUFF_RD_EN      <= '1';
@@ -257,23 +291,23 @@ begin
                     if (byte_cntr_q <= (USR_MFB_DATA'length /8)) then
                         -- This means that pre-update value is small enough to fit in MFB word 
                         BUFF_RD_EN       <= '0';
-                        rd_fsm_nst       <= S_RD_BUFF;
 
                         -- Last part of packet
-                        rd_fsm_eof       <= '1';
+                        rd_fsm_eof(0)    <= '1';
                     end if;
 
                     -- First written word gets SOF 
                     if disp_buffer_aempty = '1' then 
-                        rd_fsm_sof       <= '1';
+                        rd_fsm_sof(0)    <= '1';
                     end if;
                 end if;
 
             -- Wait until FIFO is empty (USR_MFB took all the data)
-            when S_RD_BUFF  =>
-                if disp_buffer_aempty = '1' then 
-                    rd_fsm_nst <= S_IDLE;
-                end if;
+            when S_RD_BUFF          =>
+                -- Wait
+
+            when S_UPDATE_STATUS    =>
+                HDR_BUFF_DST_RDY <= '1';
 
         end case;
     end process;
@@ -288,8 +322,6 @@ begin
             BLOCK_SIZE          => MFB_BLOCK_SIZE,
             ITEM_WIDTH          => MFB_ITEM_WIDTH,
 
-            META_WIDTH          : natural := 0;
-        
             FIFO_DEPTH          => (PKT_SIZE_MAX + 1)/(MFB_LENGTH/8),
             DEVICE              => DEVICE,
             ALMOST_FULL_OFFSET  => 0,
@@ -302,59 +334,39 @@ begin
             CLK => CLK,
             RST => RESET,
 
-            -- Metadata:
-            -- USR_MFB_META_HDR_META : out std_logic_vector(HDR_META_WIDTH -1 downto 0);
-            -- USR_MFB_META_CHAN     : out std_logic_vector(log2(CHANNELS) -1 downto 0);
-            -- USR_MFB_META_PKT_SIZE : out std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
-        
             RX_DATA     => BUFF_RD_DATA,
-            RX_META     : in  std_logic_vector(REGIONS*META_WIDTH-1 downto 0) := (others => '0');
+            RX_META     => (others => '0'),
             RX_SOF      => rd_fsm_sof,
             RX_EOF      => rd_fsm_eof,
             RX_SOF_POS  => rd_fsm_sof_pos,
             RX_EOF_POS  => rd_fsm_eof_pos,
             RX_SRC_RDY  => BUFF_RD_DATA_VLD,
             RX_DST_RDY  => open,
-        
+
             TX_DATA     => disp_buffer_data,
-            TX_META     : out std_logic_vector(REGIONS*META_WIDTH-1 downto 0);
+            TX_META     => open,
             TX_SOF      => disp_buffer_sof,
             TX_EOF      => disp_buffer_eof,
             TX_SOF_POS  => disp_buffer_sof_pos,
             TX_EOF_POS  => disp_buffer_eof_pos,
             TX_SRC_RDY  => disp_buffer_src_rdy,
             TX_DST_RDY  => disp_buffer_dst_rdy,
-        
+
             FIFO_STATUS => disp_buffer_status,
             FIFO_AFULL  => disp_buffer_afull,
             FIFO_AEMPTY => disp_buffer_aempty
         );
 
     -- =============================================================================================
-    -- OUT_FSM - Output State Machine
+    -- Send to USR_MFB
     -- =============================================================================================
-    -- TODO: SOF, EOF, EOF_POS
-    -- NOTE: the S_SOF or S_EOF are not usable
-    out_fsm_reg_p : process (CLK) is
-    begin
-        if (rising_edge(CLK)) then
-            if (RESET = '1') then
-                out_fsm_pst     <= S_IDLE;
-                out_meta_chan_q <= (others => '0');
-                out_meta_data_q <= (others => '0');
-            else--if (USR_MFB_DST_RDY = '1') then
-                out_fsm_pst     <= out_fsm_nst;
-                out_meta_chan_q <= out_meta_chan_d;
-                out_meta_data_q <= out_meta_data_d;
-            end if;
-        end if;
-    end process
-
-    out_fsm_nst_logic_p : process (all) is
+    out_fsm_logic_p : process (all) is
         variable dma_hdr_frame_ptr_v    : unsigned(DMA_FRAME_PTR_W -1 downto 0);
         variable dma_hdr_frame_length_v : unsigned(DMA_FRAME_LENGTH_W -1 downto 0);
     begin
-        out_fsm_nst     <= out_fsm_pst;
+        dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
+        dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
+
         out_meta_chan_d <= out_meta_chan_q;
         out_meta_data_d <= out_meta_data_q;
 
@@ -362,64 +374,38 @@ begin
 
         USR_MFB_SRC_RDY     <= '0';
 
-        USR_MFB_META_HDR_META   <= resize(out_meta_data_q(DMA_USR_METADATA),HDR_META_WIDTH);
-        USR_MFB_META_CHAN       <= out_meta_chan_q;
-        USR_MFB_META_PKT_SIZE   <= out_meta_data_q(DMA_FRAME_LENGTH)(USR_MFB_META_PKT_SIZE'range);
-
         PKT_SENT_INC <= '0';
         UPD_HDP_EN   <= '0';
         UPD_HHP_EN   <= '0';
 
-
-        dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
-        dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
-
         -- What about small packets (the one that can fit in one MFB word)
-        case out_fsm_pst is
+        case ctrl_fsm_pst is
             -- The S_IDLE will be triggered faster than we receive the data from buffer
             when S_IDLE             =>
-                if (HDR_BUFF_SRC_RDY = '1' then
-                    if ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
-                        out_fsm_nst <= S_WR_BUFF_OUT;
-
+                if (HDR_BUFF_SRC_RDY = '1') then
+                    if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
                         -- Store meta signals for later usage
                         out_meta_chan_d <= HDR_BUFF_CHAN;
                         out_meta_data_d <= HDR_BUFF_DATA;
-                end if;
-                
-            -- Wait until the FIFO is written to
-            when S_WR_BUFF_OUT      =>
-                if (BUFF_RD_DATA_VLD = '1') then 
-                    if (byte_cntr_q <= (USR_MFB_DATA'length /8)) then
-                        out_fsm_nst  <= S_RD_BUFF_OUT;
                     end if;
                 end if;
 
+            when S_WR_BUFF          =>    
+                -- Wait
+
             -- Read data from FIFO until it's empty
-            when S_RD_BUFF_OUT      =>
+            when S_RD_BUFF          =>
                 disp_buffer_dst_rdy <= USR_MFB_DST_RDY;
                 USR_MFB_SRC_RDY     <= disp_buffer_src_rdy;
 
-                -- Set the EOF in transition OR in update status
-                -- Maybe there (it was like that in previous implementation)
-                -- Note: same as in previous fsm
-                if (disp_buffer_aempty = '1') then
-                    out_fsm_nst <= S_UPDATE_STATUS;
-                end if;
-
             -- Set the EOF of the last word
             when S_UPDATE_STATUS    =>
-                HDR_BUFF_DST_RDY <= '1';
                 PKT_SENT_INC     <= '1';
                 UPD_HDP_EN       <= '1';
                 UPD_HHP_EN       <= '1';
 
-                out_fsm_nst         <= S_IDLE;
-
         end case;
     end process;
-
-    BUFF_RD_CHAN <= HDR_BUFF_CHAN;
 
     -- Statistics
     PKT_SENT_CHAN  <= HDR_BUFF_CHAN;
@@ -433,11 +419,18 @@ begin
     UPD_HHP_CHAN <= HDR_BUFF_CHAN;
     UPD_HHP_DATA <= std_logic_vector(unsigned(HDR_BUFF_ADDR(1 + DMA_HDR_POINTER_WIDTH -1 downto 1)) + 1);
 
+
+    -- Meta 
+    -- TODO: Check if it's correct
+    USR_MFB_META_HDR_META   <= resize(out_meta_data_q(DMA_USR_METADATA),HDR_META_WIDTH);
+    USR_MFB_META_CHAN       <= out_meta_chan_q;
+    USR_MFB_META_PKT_SIZE   <= out_meta_data_q(DMA_FRAME_LENGTH)(USR_MFB_META_PKT_SIZE'range);
+
     -- User MFB
     USR_MFB_DATA        <= disp_buffer_data;
     USR_MFB_SOF         <= disp_buffer_sof;
     USR_MFB_EOF         <= disp_buffer_eof;
     USR_MFB_SOF_POS     <= disp_buffer_sof_pos;
     USR_MFB_EOF_POS     <= disp_buffer_eof_pos;
-    USR_MFB_SRC_RDY     <= disp_buffer_src_rdy;
-    disp_buffer_dst_rdy <= USR_MFB_DST_RDY;
+
+end architecture;
