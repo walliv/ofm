@@ -213,6 +213,7 @@ begin
                 BUFF_RD_EN      <= '1';
                 BUFF_RD_ADDR    <= std_logic_vector(addr_cntr_pst);
 
+                -- Always true when SDP BRAM is used
                 if (BUFF_RD_DATA_VLD = '1') then
                     BUFF_RD_ADDR    <= std_logic_vector(addr_cntr_pst + (USR_MFB_DATA'length /8));
                     -- Update header data
@@ -242,58 +243,71 @@ begin
     -- Temporary Buffer
     -- =============================================================================================
     -- Note: FIFO should have enough space for whole packet
-        disp_buffer_i: entity work.MFB_FIFOX
-        generic map (
-            REGIONS             => MFB_REGIONS,
-            REGION_SIZE         => MFB_REGION_SIZE,
-            BLOCK_SIZE          => MFB_BLOCK_SIZE,
-            ITEM_WIDTH          => MFB_ITEM_WIDTH,
+    disp_buffer_i: entity work.MFB_FIFOX
+    generic map (
+        REGIONS             => MFB_REGIONS,
+        REGION_SIZE         => MFB_REGION_SIZE,
+        BLOCK_SIZE          => MFB_BLOCK_SIZE,
+        ITEM_WIDTH          => MFB_ITEM_WIDTH,
 
-            FIFO_DEPTH          => (PKT_SIZE_MAX + 1)/(MFB_LENGTH/8),
-            DEVICE              => DEVICE,
-            ALMOST_FULL_OFFSET  => 0,
-            ALMOST_EMPTY_OFFSET => 0
-        )
-        port map(
-            CLK => CLK,
-            RST => RESET,
+        FIFO_DEPTH          => (PKT_SIZE_MAX + 1)/(MFB_LENGTH/8),
+        DEVICE              => DEVICE,
+        ALMOST_FULL_OFFSET  => 0,
+        ALMOST_EMPTY_OFFSET => 0
+    )
+    port map(
+        CLK => CLK,
+        RST => RESET,
 
-            RX_DATA     => req_data,
-            RX_META     => req_meta,
-            RX_SOF      => (others => '0'),
-            RX_EOF      => (others => '0'),
-            RX_SOF_POS  => (others => '0'),
-            RX_EOF_POS  => (others => '0'),
-            RX_SRC_RDY  => BUFF_RD_DATA_VLD,
-            RX_DST_RDY  => req_dst_rdy,
+        RX_DATA     => req_data,
+        RX_META     => req_meta,
+        RX_SOF      => (others => '0'),
+        RX_EOF      => (others => '0'),
+        RX_SOF_POS  => (others => '0'),
+        RX_EOF_POS  => (others => '0'),
+        RX_SRC_RDY  => BUFF_RD_DATA_VLD,
+        RX_DST_RDY  => req_dst_rdy,
 
-            TX_DATA     => buff_data,
-            TX_META     => buff_meta,
-            TX_SOF      => open,
-            TX_EOF      => open,
-            TX_SOF_POS  => open,
-            TX_EOF_POS  => open,
-            TX_SRC_RDY  => buff_src_rdy,
-            TX_DST_RDY  => buff_dst_rdy,
+        TX_DATA     => buff_data,
+        TX_META     => buff_meta,
+        TX_SOF      => open,
+        TX_EOF      => open,
+        TX_SOF_POS  => open,
+        TX_EOF_POS  => open,
+        TX_SRC_RDY  => buff_src_rdy,
+        TX_DST_RDY  => buff_dst_rdy,
 
-            FIFO_STATUS => buff_status,
-            FIFO_AFULL  => buff_afull,
-            FIFO_AEMPTY => buff_aempty
+        FIFO_STATUS => buff_status,
+        FIFO_AFULL  => buff_afull,
+        FIFO_AEMPTY => buff_aempty
         );
 
-        disp_src_rdy    <= buff_src_rdy when req_fifo_en = '1'         else '0';
-        buff_dst_rdy    <= disp_dst_rdy when req_fifo_en = '1'         else '0';
-        buff_eof(0)     <=          '1' when unsigned(buff_status) = 1 else '0';
+    disp_src_rdy    <= buff_src_rdy when req_fifo_en = '1'         else '0';
+    buff_dst_rdy    <= disp_dst_rdy when req_fifo_en = '1'         else '0';
+    buff_eof(0)     <=          '1' when unsigned(buff_status) = 1 else '0';
 
-        -- TODO: Add register wall
+    -- TODO: Add register wall
+    buffer_reg_p: process(CLK) is 
+    begin
+        if rising_edge(CLK) then 
+            buff_data
+            buff_meta
+            disp_src_rdy
+        end if;
+    end process;
 
     -- =============================================================================================
     -- Wires
     -- =============================================================================================
     -- This is used when SDP BRAM is used in PCIe Buffer
-    buff_data       <= req_data;
-    buff_meta       <= req_meta;
-    buff_src_rdy    <= HDR_BUFF_SRC_RDY;
+    wire_reg_p: process(CLK) is
+    begin
+        if rising_edge(CLK) then 
+            buff_src_rdy    <= HDR_BUFF_SRC_RDY;    
+            buff_data       <= req_data;
+            buff_meta       <= req_meta;
+        end if;
+    end process;
     buff_eof(0)     <= '1' when byte_cntr_pst <= (USR_MFB_DATA'length /8) else '0';
 
     req_dst_rdy     <= USR_MFB_DST_RDY;
@@ -318,36 +332,109 @@ begin
 
     pkt_disp_fsm_nst_logic_p : process (all) is
     begin
-        disp_fsm_nst         <= disp_fsm_pst;
+        disp_fsm_nst    <= disp_fsm_pst;
 
+        disp_dst_rdy            <= '0';
+        disp_fsm_mfb_eof_pos    <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
         case disp_fsm_pst is
             when S_IDLE =>
-                req_src_rdy    <= '0';
                 if (buff_src_rdy = '1') then
-                    disp_fsm_mfb_sof(0)  <= '1';
-                    disp_fsm_mfb_src_rdy <= '1';
 
-                    if (buff_eof(0) = '1') then
-                        pkt_dispatch_nst <= S_UPDATE_STATUS;
-                    else
-                        pkt_dispatch_nst <= S_PKT_MIDDLE;
-                    end if;
+                    pkt_dispatch_nst <= S_PKT_SOF;
 
-                    if (buff_eof(0) = '1') then
-                        addr_cntr_nst        <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
-                        disp_fsm_mfb_eof(0)  <= '1';
+                    disp_dst_rdy     <= '1';
+                end if;
 
-                        disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
-                    end if;
+            -- Just sets the SOF of new packet
+            -- Data must be valid after this clock
+            when S_PKT_SOF    =>
+                disp_dst_rdy         <= '1';
+                disp_fsm_mfb_sof(0)  <= '1';
+                disp_fsm_mfb_src_rdy <= '1';
 
+                if (buff_eof(0) = '1') then
+                    pkt_dispatch_nst     <= S_UPDATE_STATUS;
+                    disp_fsm_mfb_eof(0)  <= '1';
+                    disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+                else
+                    pkt_dispatch_nst <= S_PKT_MIDDLE;
                 end if;
 
             when S_PKT_MIDDLE =>
+                if (buff_eof(0) = '1') then
+                    pkt_dispatch_nst     <= S_UPDATE_STATUS;
+                    disp_fsm_mfb_eof(0)  <= '1';
+                    disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+                end if;
+
+                disp_dst_rdy         <= '1';
+                disp_fsm_mfb_src_rdy <= '1';
 
             when S_UPDATE_STATUS =>
+                HDR_BUFF_DST_RDY <= USR_MFB_DST_RDY;
+                PKT_SENT_INC     <= USR_MFB_DST_RDY;
+                UPD_HDP_EN       <= USR_MFB_DST_RDY;
+                UPD_HHP_EN       <= USR_MFB_DST_RDY;
+
 
         end case;
     end process;
 
+    BUFF_RD_CHAN <= HDR_BUFF_CHAN;
+
+    PKT_SENT_CHAN  <= HDR_BUFF_CHAN;
+    PKT_SENT_BYTES <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(PKT_SENT_BYTES'range);
+
+    fr_len_round_up_msk <= not to_unsigned(31,16);
+    fr_len_rounded <= (unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH)) + 31) and fr_len_round_up_msk;
+
+    UPD_HDP_CHAN <= HDR_BUFF_CHAN;
+    UPD_HDP_DATA <= std_logic_vector(resize(fr_len_rounded + unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR)), DATA_POINTER_WIDTH));
+    UPD_HHP_CHAN <= HDR_BUFF_CHAN;
+    UPD_HHP_DATA <= std_logic_vector(unsigned(HDR_BUFF_ADDR(1 + DMA_HDR_POINTER_WIDTH -1 downto 1)) + 1);
+
+    -- This process delays the set of all output MFB signals because the data come from the data
+    -- buffer one clock cycle after the address and enable signal have been set.
+    out_delay_reg_p : process (CLK) is
+    begin
+        if (rising_edge(CLK)) then
+            if (RESET = '1') then
+                USR_MFB_SOF     <= (others => '0');
+                USR_MFB_EOF     <= (others => '0');
+                USR_MFB_EOF_POS <= (others => '0');
+                USR_MFB_SRC_RDY <= '0';
+            elsif (USR_MFB_DST_RDY = '1') then
+                USR_MFB_SOF     <= disp_fsm_mfb_sof;
+                USR_MFB_EOF     <= disp_fsm_mfb_eof;
+                USR_MFB_EOF_POS <= disp_fsm_mfb_eof_pos;
+                USR_MFB_SRC_RDY <= disp_fsm_mfb_src_rdy;
+            end if;
+        end if;
+    end process;
+
+    USR_MFB_META_HDR_META <= resize(HDR_BUFF_DATA(DMA_USR_METADATA),HDR_META_WIDTH);
+    USR_MFB_META_CHAN     <= HDR_BUFF_CHAN;
+    USR_MFB_META_PKT_SIZE <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(USR_MFB_META_PKT_SIZE'range);
+
+    USR_MFB_DATA    <= BUFF_RD_DATA when mfb_dst_rdy_reg = '1' else buff_rd_data_reg;
+    USR_MFB_SOF_POS <= (others => '0');
+
+    mfb_dst_rdy_reg_p : process (CLK) is
+    begin
+        if (rising_edge(CLK)) then
+            mfb_dst_rdy_reg <= USR_MFB_DST_RDY;
+        end if;
+    end process;
+
+    buff_rd_data_reg_p : process (CLK) is
+    begin
+        if (rising_edge(CLK)) then
+            if (RESET = '1') then
+                buff_rd_data_reg <= (others => '0');
+            elsif (mfb_dst_rdy_reg = '1') then
+                buff_rd_data_reg <= BUFF_RD_DATA;
+            end if;
+        end if;
+    end process;
 
 end architecture;
