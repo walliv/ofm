@@ -6,14 +6,14 @@
 
 # Set paths
 set PKG_BASE        "$OFM_PATH/comp/base/pkg"
-set MFB_FIFOX_BASE  "$OFM_PATH/comp/mfb_tools/storage/fifox"
+set FIFOX_BASE      "$OFM_PATH/comp/base/fifo/fifox"
 
 # Packages
 lappend PACKAGES "$PKG_BASE/math_pack.vhd"
 lappend PACKAGES "$PKG_BASE/type_pack.vhd"
 lappend PACKAGES "$ENTITY_BASE/../../../rx/comp/hdr_manager/pkg/dma_hdr_pkg.vhd"
 
-lappend COMPONENTS [ list "MFB_FIFOX"  $MFB_FIFOX_BASE    "FULL" ]
+lappend COMPONENTS [ list "FIFOX"  $FIFOX_BASE    "FULL" ]
 
 # Source files for implemented component
 lappend MOD "$ENTITY_BASE/tx_dma_pkt_dispatcher.vhd"
