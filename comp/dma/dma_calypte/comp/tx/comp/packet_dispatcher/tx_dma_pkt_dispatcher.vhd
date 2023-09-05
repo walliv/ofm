@@ -108,23 +108,23 @@ end entity;
 
 architecture FULL of TX_DMA_PKT_DISPATCHER is
     -- Constants:
-    constant MFB_LENGTH   : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
-    constant META_LENGTH  : natural := HDR_META_WIDTH + log2(CHANNELS) + log2(PKT_SIZE_MAX + 1);
+    constant MFB_LENGTH     : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
+    constant META_LENGTH    : natural := HDR_META_WIDTH + log2(CHANNELS) + log2(PKT_SIZE_MAX + 1);
 
     type request_fsm_t is (S_IDLE, S_WR_FIFO, S_RD_DLY, S_RD_FIFO);
-    signal req_fsm_pst : request_fsm_t := S_IDLE;
-    signal req_fsm_nst : request_fsm_t := S_IDLE;
+    signal req_fsm_pst      : request_fsm_t := S_IDLE;
+    signal req_fsm_nst      : request_fsm_t := S_IDLE;
 
     type pkt_dispatch_state_t is (S_IDLE, S_PKT_MIDDLE, S_UPDATE_STATUS);
     signal pkt_dispatch_pst : pkt_dispatch_state_t := S_IDLE;
     signal pkt_dispatch_nst : pkt_dispatch_state_t := S_IDLE;
 
     -- Output 
-    signal addr_cntr_pst : unsigned(BUFF_RD_ADDR'range);
-    signal addr_cntr_nst : unsigned(BUFF_RD_ADDR'range);
+    signal addr_cntr_pst    : unsigned(BUFF_RD_ADDR'range);
+    signal addr_cntr_nst    : unsigned(BUFF_RD_ADDR'range);
 
-    signal byte_cntr_pst : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
-    signal byte_cntr_nst : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
+    signal byte_cntr_pst    : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
+    signal byte_cntr_nst    : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
 
     signal disp_fsm_mfb_sof     : std_logic_vector(USR_MFB_SOF'range);
     signal disp_fsm_mfb_eof     : std_logic_vector(USR_MFB_EOF'range);
@@ -133,20 +133,20 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     signal mfb_dst_rdy_reg      : std_logic;
     signal buff_rd_data_reg     : std_logic_vector(BUFF_RD_DATA'range);
 
-    signal fr_len_round_up_msk : unsigned(16 -1 downto 0);
-    signal fr_len_rounded      : unsigned(16 -1 downto 0);
+    signal fr_len_round_up_msk  : unsigned(16 -1 downto 0);
+    signal fr_len_rounded       : unsigned(16 -1 downto 0);
 
     -- Requester
-    signal req_fifo_en  : std_logic;
+    signal req_fifo_en      : std_logic;
 
-    signal addr_cntr_d : unsigned(BUFF_RD_ADDR'range);
-    signal addr_cntr_q : unsigned(BUFF_RD_ADDR'range);
+    signal addr_cntr_d      : unsigned(BUFF_RD_ADDR'range);
+    signal addr_cntr_q      : unsigned(BUFF_RD_ADDR'range);
 
-    signal byte_cntr_d : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
-    signal byte_cntr_q : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
+    signal byte_cntr_d      : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
+    signal byte_cntr_q      : unsigned(log2(PKT_SIZE_MAX+1) -1 downto 0);
 
     -- FIFO data out
-    signal disp_buff_do : std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
+    signal disp_buff_do     : std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
 
     -- Input
     signal pcie_buff_chan   : std_logic_vector(log2(CHANNELS) -1 downto 0);
@@ -226,7 +226,7 @@ begin
                     BUFF_RD_EN      <= '1';
                     BUFF_RD_ADDR    <= std_logic_vector(addr_cntr_q);
 
-                    -- Always true when SDP BRAM is used
+                    -- Received data are valid - new address can be set
                     if (BUFF_RD_DATA_VLD = '1') then
                         BUFF_RD_ADDR  <= std_logic_vector(addr_cntr_q + (USR_MFB_DATA'length /8));
 
@@ -244,8 +244,9 @@ begin
                 when S_RD_DLY  =>
                     req_fsm_nst <= S_RD_FIFO;
 
+                -- Delay: WR and DI have no delay, FULL, DO and EMPTY is pre calculated and has no delay.
                 when S_RD_FIFO =>
-                    -- It takes two clocks 
+                    -- It takes two clocks
                     dma_hdr_src_rdy <= '1';
                     req_fifo_en     <= '1';
 

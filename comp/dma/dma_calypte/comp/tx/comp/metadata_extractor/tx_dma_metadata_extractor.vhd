@@ -141,7 +141,7 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal chan_num_int          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(max(1, log2(CHANNELS)) -1 downto 0);
 
     -- Determines if curently contained payload of the incoming PCIe transaction is a DMA header
-    signal is_dma_hdr        : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
+    signal is_dma_hdr            : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
 
     -- contains the last byte enable, first byte enable signals from the PCIE META input, the size
     -- of a current PCIE transaction in bytes and one bit indication if DMA header is included in a
