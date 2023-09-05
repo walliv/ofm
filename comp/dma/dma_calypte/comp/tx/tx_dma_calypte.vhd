@@ -46,14 +46,14 @@ entity TX_DMA_CALYPTE is
         -- Output interface to the FPGA user logic
         -- =========================================================================================
         USR_TX_MFB_REGIONS     : natural := 1;
-        USR_TX_MFB_REGION_SIZE : natural := 4;
+        USR_TX_MFB_REGION_SIZE : natural := 8;
         USR_TX_MFB_BLOCK_SIZE  : natural := 8;
         USR_TX_MFB_ITEM_WIDTH  : natural := 8;
 
         -- =========================================================================================
         -- Input PCIe interface (Completer Request)
         -- =========================================================================================
-        PCIE_CQ_MFB_REGIONS     : natural := 1;
+        PCIE_CQ_MFB_REGIONS     : natural := 2;
         PCIE_CQ_MFB_REGION_SIZE : natural := 1;
         PCIE_CQ_MFB_BLOCK_SIZE  : natural := 8;
         PCIE_CQ_MFB_ITEM_WIDTH  : natural := 32;
@@ -114,7 +114,8 @@ entity TX_DMA_CALYPTE is
         -- Accepts PCIe write and read requests
         -- =========================================================================================
         PCIE_CQ_MFB_DATA    : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE*PCIE_CQ_MFB_ITEM_WIDTH-1 downto 0);
-        PCIE_CQ_MFB_META    : in  std_logic_vector(PCIE_CQ_META_WIDTH -1 downto 0);
+        --hmm
+        PCIE_CQ_MFB_META    : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*PCIE_CQ_META_WIDTH -1 downto 0);
         PCIE_CQ_MFB_SOF     : in  std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
         PCIE_CQ_MFB_EOF     : in  std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
         PCIE_CQ_MFB_SOF_POS : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0);
@@ -167,7 +168,7 @@ architecture FULL of TX_DMA_CALYPTE is
     constant META_IS_DMA_HDR_W : natural := 1;
     constant META_PCIE_ADDR_W  : natural := 62;
     constant META_CHAN_NUM_W   : natural := log2(CHANNELS);
-    constant META_BE_W         : natural := PCIE_CQ_MFB_WIDTH/8;
+    constant META_BE_W         : natural := (PCIE_CQ_MFB_WIDTH/PCIE_CQ_MFB_REGIONS)/8;
     constant META_BYTE_CNT_W   : natural := 13;
 
     constant META_IS_DMA_HDR_O : natural := 0;
@@ -209,11 +210,11 @@ architecture FULL of TX_DMA_CALYPTE is
     signal upd_hhp_data : std_logic_vector(DMA_HDR_POINTER_WIDTH -1 downto 0);
     signal upd_hhp_en   : std_logic;
 
-    signal ext_mfb_meta_is_dma_hdr : std_logic;
-    signal ext_mfb_meta_pcie_addr  : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
-    signal ext_mfb_meta_chan_num   : std_logic_vector(META_CHAN_NUM_W -1 downto 0);
-    signal ext_mfb_meta_byte_en    : std_logic_vector(META_BE_W -1 downto 0);
-    signal ext_mfb_meta_byte_cnt   : std_logic_vector(META_BYTE_CNT_W -1 downto 0);
+    signal ext_mfb_meta_is_dma_hdr : std_logic_vector(PCIE_CQ_MFB_REGIONS - 1 downto 0);
+    signal ext_mfb_meta_pcie_addr  : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_PCIE_ADDR_W -1 downto 0);
+    signal ext_mfb_meta_chan_num   : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_CHAN_NUM_W -1 downto 0);
+    signal ext_mfb_meta_byte_en    : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BE_W -1 downto 0);
+    signal ext_mfb_meta_byte_cnt   : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BYTE_CNT_W -1 downto 0);
 
     signal ext_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
     signal ext_mfb_sof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
@@ -224,7 +225,7 @@ architecture FULL of TX_DMA_CALYPTE is
     signal ext_mfb_dst_rdy : std_logic;
 
     signal st_sp_ctrl_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
-    signal st_sp_ctrl_mfb_meta    : std_logic_vector(META_BE_W + META_BE_O -1 downto 0);
+    signal st_sp_ctrl_mfb_meta    : std_logic_vector(PCIE_CQ_MFB_REGIONS*(META_BE_W + META_BE_O) -1 downto 0);
     signal st_sp_ctrl_mfb_sof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
     signal st_sp_ctrl_mfb_eof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
     signal st_sp_ctrl_mfb_sof_pos : std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0);
@@ -232,10 +233,11 @@ architecture FULL of TX_DMA_CALYPTE is
     signal st_sp_ctrl_mfb_src_rdy : std_logic;
     signal st_sp_ctrl_mfb_dst_rdy : std_logic;
 
-    signal trbuff_rd_chan : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal trbuff_rd_data : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
-    signal trbuff_rd_addr : std_logic_vector(DATA_POINTER_WIDTH -1 downto 0);
-    signal trbuff_rd_en   : std_logic;
+    signal trbuff_rd_chan         : std_logic_vector(log2(CHANNELS) -1 downto 0);
+    signal trbuff_rd_data         : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
+    signal trbuff_rd_addr         : std_logic_vector(DATA_POINTER_WIDTH -1 downto 0);
+    signal trbuff_rd_en           : std_logic;
+    signal trbuff_rd_data_vld     : std_logic;
 
     signal hdr_fifo_tx_data    : std_logic_vector(62 + log2(CHANNELS) + 64 -1 downto 0);
     signal hdr_fifo_tx_src_rdy : std_logic;
@@ -271,19 +273,29 @@ architecture FULL of TX_DMA_CALYPTE is
     signal hdr_fifo_status : std_logic_vector(log2((2**DMA_HDR_POINTER_WIDTH) * CHANNELS) downto 0);
     -- attribute mark_debug of hdr_fifo_status : signal is "true";
 
+    -- fifox_multi support
+    signal st_sp_ctrl_mfb_meta_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)((META_BE_W + META_BE_O) -1 downto 0);
+    signal st_sp_ctrl_mfb_data_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)(PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE*PCIE_CQ_MFB_ITEM_WIDTH - 1 downto 0);
+    signal fifox_mult_di            : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)(62 + log2(CHANNELS) + 64 - 1 downto 0);
+    signal fifox_mult_wr            : std_logic_vector(PCIE_CQ_MFB_REGIONS - 1 downto 0);
+
+    signal dma_hdr_data             : std_logic_vector(62 + log2(CHANNELS) + 64 - 1 downto 0);
+    signal dma_hdr_src_rdy          : std_logic;
+    signal fifox_mult_empty         : std_logic_vector(0 downto 0);
+
 begin
 
-    assert (USR_TX_MFB_REGIONS = 1 and USR_TX_MFB_REGION_SIZE = 4 and USR_TX_MFB_BLOCK_SIZE = 8 and USR_TX_MFB_ITEM_WIDTH = 8)
-        report "TX_DMA_CALYPTE: unsupported USR_TX_MFB configuration, the alowed are: (1,4,8,8)"
-        severity FAILURE;
+    -- assert (USR_TX_MFB_REGIONS = 1 and USR_TX_MFB_REGION_SIZE = 4 and USR_TX_MFB_BLOCK_SIZE = 8 and USR_TX_MFB_ITEM_WIDTH = 8)
+    --     report "TX_DMA_CALYPTE: unsupported USR_TX_MFB configuration, the alowed are: (1,4,8,8)"
+    --     severity FAILURE;
 
-    assert (PCIE_CQ_MFB_REGIONS = 1 and PCIE_CQ_MFB_REGION_SIZE = 1 and PCIE_CQ_MFB_BLOCK_SIZE = 8 and PCIE_CQ_MFB_ITEM_WIDTH = 32)
-        report "TX_DMA_CALYPTE: unsupported PCIE_CQ_MFB configuration, the allowed are: (1,1,8,32)"
-        severity FAILURE;
+    -- assert (PCIE_CQ_MFB_REGIONS = 1 and PCIE_CQ_MFB_REGION_SIZE = 1 and PCIE_CQ_MFB_BLOCK_SIZE = 8 and PCIE_CQ_MFB_ITEM_WIDTH = 32)
+    --     report "TX_DMA_CALYPTE: unsupported PCIE_CQ_MFB configuration, the allowed are: (1,1,8,32)"
+    --     severity FAILURE;
 
-    assert (DEVICE = "ULTRASCALE")
-        report "TX_DMA_CALYPTE: unsupported device type, the allowed are: ULTRASCALE"
-        severity FAILURE;
+    -- assert (DEVICE = "ULTRASCALE")
+    --     report "TX_DMA_CALYPTE: unsupported device type, the allowed are: ULTRASCALE"
+    --     severity FAILURE;
 
     assert (PKT_SIZE_MAX <= 2**DATA_POINTER_WIDTH)
         report "TX_DMA_CALYPTE: too large PKT_SIZE_MAX, the internal buffer must be able to fit at least one packet of the size of the PKT_SIZE_MAX. Either change DATA_POINTER_WIDTH or PKT_SIZE_MAX generic."
@@ -464,11 +476,64 @@ begin
             PCIE_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_dst_rdy and (not st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0)),
             PCIE_MFB_DST_RDY => open,
 
-            RD_CHAN => trbuff_rd_chan,
-            RD_DATA => trbuff_rd_data,
-            RD_ADDR => trbuff_rd_addr,
-            RD_EN   => trbuff_rd_en);
+            RD_CHAN     => trbuff_rd_chan,
+            RD_DATA     => trbuff_rd_data,
+            RD_ADDR     => trbuff_rd_addr,
+            RD_EN       => trbuff_rd_en,
+            RD_DATA_VLD => trbuff_rd_data_vld
+        );
 
+    merge_fifo_g: if PCIE_CQ_MFB_REGIONS = 2 generate
+        
+        -- Deserialize metadata for better handling 
+        st_sp_ctrl_mfb_meta_arr     <= slv_array_deser(st_sp_ctrl_mfb_meta, PCIE_CQ_MFB_REGIONS);
+        st_sp_ctrl_mfb_data_arr     <= slv_array_deser(st_sp_ctrl_mfb_data, PCIE_CQ_MFB_REGIONS);
+
+        -- Insert data for each DMA header
+        fifox_mult_di(0)    <= st_sp_ctrl_mfb_meta_arr(0)(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta_arr(0)(META_CHAN_NUM) & st_sp_ctrl_mfb_data_arr(0)(63 downto 0);
+        fifox_mult_di(1)    <= st_sp_ctrl_mfb_meta_arr(1)(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta_arr(1)(META_CHAN_NUM) & st_sp_ctrl_mfb_data_arr(1)(63 downto 0);
+
+        -- Set valid for each port
+        fifox_multi_vld_p: process(all) is
+        begin
+            if st_sp_ctrl_mfb_src_rdy = '1' then 
+                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_arr(1)(META_IS_DMA_HDR)(0) & st_sp_ctrl_mfb_meta_arr(0)(META_IS_DMA_HDR)(0);
+            else 
+                fifox_mult_wr   <= (others => '0');
+            end if;
+        end process; 
+
+        -- FIFOX MULTI: (2 to 1) 
+        merge_fifo_i: entity work.FIFOX_MULTI
+        generic map(
+            DATA_WIDTH      => 62 + log2(CHANNELS) + 64,
+            ITEMS           => (2**DMA_HDR_POINTER_WIDTH) * CHANNELS,
+            WRITE_PORTS     => PCIE_CQ_MFB_REGIONS,
+            READ_PORTS      => 1,
+            DEVICE          => DEVICE
+        )
+        port map (
+            CLK     => CLK,
+            RESET   => RESET,
+
+            DI      => slv_array_ser(fifox_mult_di),
+            WR      => fifox_mult_wr,
+            FULL    => open,
+            AFULL   => open,
+        
+            DO      => dma_hdr_data,
+            RD      => "1",
+            EMPTY   => fifox_mult_empty,
+            AEMPTY  => open
+        );
+
+        dma_hdr_src_rdy <= not fifox_mult_empty(0);
+    else generate
+        dma_hdr_data    <= st_sp_ctrl_mfb_meta(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta(META_CHAN_NUM) & st_sp_ctrl_mfb_data(63 downto 0);
+        dma_hdr_src_rdy <= st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0);
+    end generate;
+
+    -- Add registers if DMA header overtakes the data
     dma_hdr_fifo_i : entity work.MVB_FIFOX
         generic map (
             ITEMS               => 1,
@@ -483,9 +548,9 @@ begin
             CLK   => CLK,
             RESET => RESET,
 
-            RX_DATA    => st_sp_ctrl_mfb_meta(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta(META_CHAN_NUM) & st_sp_ctrl_mfb_data(63 downto 0),
+            RX_DATA    => dma_hdr_data,
             RX_VLD     => "1",
-            RX_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0),
+            RX_SRC_RDY => dma_hdr_src_rdy,
             RX_DST_RDY => st_sp_ctrl_mfb_dst_rdy,
 
             TX_DATA    => hdr_fifo_tx_data,
@@ -534,10 +599,11 @@ begin
             HDR_BUFF_SRC_RDY => hdr_fifo_tx_src_rdy,
             HDR_BUFF_DST_RDY => hdr_fifo_tx_dst_rdy,
 
-            BUFF_RD_CHAN => trbuff_rd_chan,
-            BUFF_RD_DATA => trbuff_rd_data,
-            BUFF_RD_ADDR => trbuff_rd_addr,
-            BUFF_RD_EN   => trbuff_rd_en,
+            BUFF_RD_CHAN     => trbuff_rd_chan,
+            BUFF_RD_DATA     => trbuff_rd_data,
+            BUFF_RD_ADDR     => trbuff_rd_addr,
+            BUFF_RD_EN       => trbuff_rd_en,
+            BUFF_RD_DATA_VLD => trbuff_rd_data_vld,
 
             PKT_SENT_CHAN  => pkt_sent_chan,
             PKT_SENT_INC   => pkt_sent_inc,
