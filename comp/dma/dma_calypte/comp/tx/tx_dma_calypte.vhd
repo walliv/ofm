@@ -114,11 +114,10 @@ entity TX_DMA_CALYPTE is
         -- Accepts PCIe write and read requests
         -- =========================================================================================
         PCIE_CQ_MFB_DATA    : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE*PCIE_CQ_MFB_ITEM_WIDTH-1 downto 0);
-        --hmm
         PCIE_CQ_MFB_META    : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*PCIE_CQ_META_WIDTH -1 downto 0);
         PCIE_CQ_MFB_SOF     : in  std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
         PCIE_CQ_MFB_EOF     : in  std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
-        PCIE_CQ_MFB_SOF_POS : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0);
+        PCIE_CQ_MFB_SOF_POS : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0):= (others => '0');
         PCIE_CQ_MFB_EOF_POS : in  std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE)) -1 downto 0);
         PCIE_CQ_MFB_SRC_RDY : in  std_logic;
         PCIE_CQ_MFB_DST_RDY : out std_logic := '1';
@@ -558,6 +557,11 @@ begin
             CHANNELS       => CHANNELS,
             HDR_META_WIDTH => HDR_META_WIDTH,
             PKT_SIZE_MAX   => PKT_SIZE_MAX,
+
+            PCIE_MFB_REGIONS        => PCIE_CQ_MFB_REGIONS,
+            PCIE_MFB_REGION_SIZE    => PCIE_CQ_MFB_REGION_SIZE,
+            PCIE_MFB_BLOCK_SIZE     => PCIE_CQ_MFB_BLOCK_SIZE,
+            PCIE_MFB_ITEM_WIDTH     => PCIE_CQ_MFB_ITEM_WIDTH,        
 
             MFB_REGIONS     => USR_TX_MFB_REGIONS,
             MFB_REGION_SIZE => USR_TX_MFB_REGION_SIZE,

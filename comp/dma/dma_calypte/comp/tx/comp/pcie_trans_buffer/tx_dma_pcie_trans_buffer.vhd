@@ -159,20 +159,20 @@ begin
     pcie_mfb_sof_reg_num    (0) <= PCIE_MFB_SOF;
     pcie_mfb_src_rdy_reg_num(0) <= PCIE_MFB_SRC_RDY;
 
-    input_shift_reg_p: process(CLK)
-    begin
-        if rising_edge(CLK) then
-            for i in 1 to REG_NUM loop
-                pcie_mfb_data_reg_num   (i) <= pcie_mfb_data_reg_num   (i - 1);
-                pcie_mfb_meta_reg_num   (i) <= pcie_mfb_meta_reg_num   (i - 1);
-                pcie_mfb_sof_reg_num    (i) <= pcie_mfb_sof_reg_num    (i - 1);  
-                pcie_mfb_src_rdy_reg_num(i) <= pcie_mfb_src_rdy_reg_num(i - 1);
-            end loop;
-            if RESET = '1' then
-                pcie_mfb_src_rdy_reg_num(REG_NUM downto 1) <= (others => '0');
+    input_shift_reg_g: for i in 0 to REG_NUM - 1 generate
+        input_shift_reg_p: process(CLK) is
+        begin    
+            if rising_edge(CLK) then
+                pcie_mfb_data_reg_num   (i + 1) <= pcie_mfb_data_reg_num   (i);
+                pcie_mfb_meta_reg_num   (i + 1) <= pcie_mfb_meta_reg_num   (i);
+                pcie_mfb_sof_reg_num    (i + 1) <= pcie_mfb_sof_reg_num    (i);  
+                pcie_mfb_src_rdy_reg_num(i + 1) <= pcie_mfb_src_rdy_reg_num(i);
+                if RESET = '1' then
+                    pcie_mfb_src_rdy_reg_num(i + 1) <= '0';
+                end if;
             end if;
-        end if;
-    end process;
+        end process;
+    end generate;
 
     -- Meta array
     pcie_mfb_meta_arr   <= slv_array_deser(pcie_mfb_meta_reg_num(REG_NUM), MFB_REGIONS);
@@ -465,25 +465,25 @@ begin
     -- =============================================================================================
     -- Input registers - BRAM
     -- =============================================================================================
-
+    --slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0) <= slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     wr_be_bram_reg_num  (0) <= wr_be_bram_demux;
     wr_addr_bram_reg_num(0) <= wr_addr_bram_by_shift;
     wr_data_bram_reg_num(0) <= wr_data_bram_bshifter;
-    
-    bram_input_reg_p: process(CLK)
-    begin
-        if rising_edge(CLK) then 
-            for i in 1 to REG_NUM loop
-                wr_be_bram_reg_num  (i) <= wr_be_bram_reg_num  (i - 1);
-                wr_addr_bram_reg_num(i) <= wr_addr_bram_reg_num(i - 1);
-                wr_data_bram_reg_num(i) <= wr_data_bram_reg_num(i - 1);
-            end loop;
-            -- Reset of WR_EN
-            if RESET = '1' then 
-                wr_be_bram_reg_num(REG_NUM downto 1)  <= (others => (others => (others => (others => '0'))));
+
+    bram_input_reg_g: for i in 0 to REG_NUM - 1 generate
+        bram_input_reg_p: process(CLK) is 
+        begin
+            if rising_edge(CLK) then 
+                wr_be_bram_reg_num  (i + 1) <= wr_be_bram_reg_num  (i);
+                wr_addr_bram_reg_num(i + 1) <= wr_addr_bram_reg_num(i);
+                wr_data_bram_reg_num(i + 1) <= wr_data_bram_reg_num(i);
+                -- Reset of WR_EN
+                if RESET = '1' then 
+                    wr_be_bram_reg_num(i + 1)  <= (others => (others => (others => '0')));
+                end if;
             end if;
-        end if;
-    end process;
+        end process;
+    end generate;
 
     -- =============================================================================================
     -- BRAM - One region
@@ -527,6 +527,12 @@ begin
                     );
             end generate;
         end generate;
+            
+        rd_data_valid_arr       <= (others => '0');
+        addr_sel                <= (others => '0');
+        rd_en_pch               <= (others => (others => '0'));
+        wr_addr_bram_by_multi   <= (others => (others => (others => '0')));
+        rw_addr_bram_by_mux     <= (others => (others => (others => '0')));
     end generate;
 
     -- =============================================================================================
