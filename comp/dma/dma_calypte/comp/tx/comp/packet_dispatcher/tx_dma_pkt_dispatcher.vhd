@@ -34,10 +34,13 @@ entity TX_DMA_PKT_DISPATCHER is
         -- For one region is used SDP BRAM
         -- For two regions is used TDP BRAM (BUFF_RD_DATA_VLD is used)
         -- => Different latencies while reading
-        PCIE_MFB_REGIONS    : natural := 2; -- 1/2
+        PCIE_MFB_REGIONS        : natural := 2; -- 1/2
+        PCIE_MFB_REGION_SIZE    : natural := 1;
+        PCIE_MFB_BLOCK_SIZE     : natural := 8;
+        PCIE_MFB_ITEM_WIDTH     : natural := 32;
 
         MFB_REGIONS         : natural := 1;
-        MFB_REGION_SIZE     : natural := 8; -- 4/8
+        MFB_REGION_SIZE     : natural := 4; -- 4/8
         MFB_BLOCK_SIZE      : natural := 8;
         MFB_ITEM_WIDTH      : natural := 8;
 
@@ -197,6 +200,7 @@ begin
 
             BUFF_RD_ADDR      <= (others => '0');
             BUFF_RD_EN        <= '0';
+            BUFF_RD_CHAN      <= pcie_buff_chan;
 
             dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
             dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
@@ -298,6 +302,8 @@ begin
         end process;
 
     else generate
+
+    --bram_sel_one_region_g : if PCIE_MFB_REGIONS = 1 generate
         -- PCIe Buffer
         pcie_buff_data   <= BUFF_RD_DATA;
         BUFF_RD_CHAN     <= pcie_buff_chan;
