@@ -17,11 +17,11 @@ package test;
     parameter MI_WIDTH = 32;
 
     parameter USER_TX_MFB_REGIONS     = 1;
-    parameter USER_TX_MFB_REGION_SIZE = 4;
+    parameter USER_TX_MFB_REGION_SIZE = 8;
     parameter USER_TX_MFB_BLOCK_SIZE  = 8;
     parameter USER_TX_MFB_ITEM_WIDTH  = 8;
 
-    parameter PCIE_CQ_MFB_REGIONS     = 1;
+    parameter PCIE_CQ_MFB_REGIONS     = 2;
     parameter PCIE_CQ_MFB_REGION_SIZE = 1;
     parameter PCIE_CQ_MFB_BLOCK_SIZE  = 8;
     parameter PCIE_CQ_MFB_ITEM_WIDTH  = 32;

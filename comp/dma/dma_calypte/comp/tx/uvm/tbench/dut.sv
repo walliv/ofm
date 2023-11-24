@@ -21,13 +21,13 @@ module DUT(
     logic [$clog2(CHANNELS)-1:0]       channel;
     logic [24-1:0]                     meta;
 
-    logic [((PCIE_CQ_MFB_REGION_SIZE != 1) ? $clog2(PCIE_CQ_MFB_REGION_SIZE) : 1)-1 : 0] sof_pos;
-    generate
-        if (PCIE_CQ_MFB_REGION_SIZE != 1) begin
-            assign sof_pos = mfb_rx.SOF_POS;
-        end else
-            assign sof_pos = '0;
-    endgenerate
+    // logic [((PCIE_CQ_MFB_REGION_SIZE != 1) ? $clog2(PCIE_CQ_MFB_REGION_SIZE) : 1)-1 : 0] sof_pos;
+    // generate
+    //     if (PCIE_CQ_MFB_REGION_SIZE != 1) begin
+    //         assign sof_pos = mfb_rx.SOF_POS;
+    //     end else
+    //         assign sof_pos = '0;
+    // endgenerate
 
     generate
         //{packet_size, channel, meta} 24 + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS)[CHANNELS]
@@ -89,7 +89,7 @@ module DUT(
 
         .PCIE_CQ_MFB_DATA          (mfb_rx.DATA),
         .PCIE_CQ_MFB_META          (mfb_rx.META),
-        .PCIE_CQ_MFB_SOF_POS       (sof_pos),
+        // .PCIE_CQ_MFB_SOF_POS       ('0),//mfb_rx.SOF_POS),
         .PCIE_CQ_MFB_EOF_POS       (mfb_rx.EOF_POS),
         .PCIE_CQ_MFB_SOF           (mfb_rx.SOF),
         .PCIE_CQ_MFB_EOF           (mfb_rx.EOF),
