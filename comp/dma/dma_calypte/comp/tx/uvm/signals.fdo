@@ -123,6 +123,16 @@ proc internals {PATH CHANNELS} {
     add_wave "-noupdate -group \"INTERNALS\" -hex" $PATH/trbuff_rd_addr
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/trbuff_rd_en
 
+    add wave -group "INTERNALS" -noupdate -divider "fifox_multi"
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/st_sp_ctrl_mfb_meta_arr
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/st_sp_ctrl_mfb_data_arr
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_di
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_wr
+
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/dma_hdr_data
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/dma_hdr_src_rdy
+    add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_empty
+
     add wave -group "INTERNALS" -noupdate -divider "Header_buffer_reading_interface"
     dma_hdr_deparse $PATH/st_sp_ctrl_mfb_data "INTERNALS" 1
     dma_hdr_deparse $PATH/hdr_fifo_tx_data "INTERNALS" 2
@@ -219,6 +229,27 @@ proc chan_start_stop_ctrl {PATH CHANNELS} {
     add_wave "-noupdate -group \"$grp_name\"" $PATH/pkt_acc_nst
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/chan_pkt_drop_en
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/pkt_drop_en
+
+    add wave -noupdate -group "$grp_name" -divider "Internals - Two regions"
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/is_dma_hdr_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_meta_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_sof_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_data_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_disc_chan_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_disc_bytes_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_disc_inc_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fifox_mult_di
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fifox_mult_do
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fifox_mult_empty
+
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fifox_mult_full
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fifo_full_reg
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_meta_ext
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/meta_is_dma_hdr_int
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/meta_pcie_addr_int
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/meta_chan_num_int
 }
 
 proc meta_extractor {PATH CHANNELS} {
@@ -309,6 +340,7 @@ proc trans_buffer {PATH CHANNELS} {
     add_wave "-noupdate -group \"$grp_name\"" $PATH/RD_DATA
     add_wave "-noupdate -group \"$grp_name\"" $PATH/RD_ADDR
     add_wave "-noupdate -group \"$grp_name\"" $PATH/RD_EN
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/RD_DATA_VLD
 
     add wave -noupdate -group "$grp_name" -divider "Internals"
 
@@ -328,6 +360,21 @@ proc trans_buffer {PATH CHANNELS} {
     add_wave "-noupdate -group \"$grp_name\"" $PATH/rd_data_bram_mux
     add_wave "-noupdate -group \"$grp_name\"" $PATH/rd_data_bram
     add_wave "-noupdate -group \"$grp_name\"" $PATH/rd_addr_bram_by_shift
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_meta_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/wr_addr_bram_by_multi
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/rw_addr_bram_by_mux
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/rd_data_valid_arr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/rd_en_pch
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_meta_be
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/wr_be_bram_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/wr_addr_bram_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/wr_data_bram_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_data_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_meta_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_sof_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_mfb_src_rdy_reg_num
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/addr_sel
 }
 
 proc pkt_dispatcher {PATH} {
@@ -338,6 +385,7 @@ proc pkt_dispatcher {PATH} {
     add_wave "-noupdate -group \"$grp_name\" -unsigned" $PATH/BUFF_RD_CHAN
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_DATA
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_ADDR
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_DATA_VLD
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_EN
 
     add wave -noupdate -group "$grp_name" -divider "HDR_BUFFER"
@@ -391,6 +439,33 @@ proc pkt_dispatcher {PATH} {
 
     add_wave "-noupdate -group \"$grp_name\"" $PATH/mfb_dst_rdy_reg
     add_wave "-noupdate -group \"$grp_name\"" $PATH/buff_rd_data_reg
+    
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_buff_chan
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_buff_data
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_buff_addr
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_buff_en
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/pcie_buff_empty
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/dma_hdr_src_rdy
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/dma_hdr_dst_rdy
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/req_fsm_pst
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/req_fsm_nst
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_pst
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_nst
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fr_len_round_up_msk
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/fr_len_rounded
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/req_fifo_en
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/addr_cntr_d
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/addr_cntr_q
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_d
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_q
+
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/disp_buff_do
+
 }
 
 proc sw_mgr {PATH} {
