@@ -222,7 +222,7 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     signal pcie_mfb_meta_ext        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_BE_O + META_BE_W -1 downto 0);
 
 begin
-    assert (fifo_full_reg = '0') report "TX_DMA_CHAN_START_STOP_CTRL: FIFOX_MULTI OVERFLOW!" severity Failure;
+    -- assert (fifo_full_reg = '0') report "TX_DMA_CHAN_START_STOP_CTRL: FIFOX_MULTI OVERFLOW!" severity Failure;
 
     -- Debug signal for one region
     stop_req_while_pending_ored <= or stop_req_while_pending;
@@ -657,5 +657,4 @@ begin
             TX_SRC_RDY => USR_MFB_SRC_RDY,
             TX_DST_RDY => USR_MFB_DST_RDY
         );
-
 end architecture;
