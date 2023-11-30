@@ -215,6 +215,13 @@ architecture FULL of TX_DMA_CALYPTE is
     signal ext_mfb_meta_byte_en    : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BE_W -1 downto 0);
     signal ext_mfb_meta_byte_cnt   : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BYTE_CNT_W -1 downto 0);
 
+    signal ext_mfb_meta_pcie_addr_arr  : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_PCIE_ADDR_W -1 downto 0);
+    signal ext_mfb_meta_chan_num_arr   : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_CHAN_NUM_W -1 downto 0);
+    signal ext_mfb_meta_byte_en_arr    : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_BE_W -1 downto 0);
+    signal ext_mfb_meta_byte_cnt_arr   : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_BYTE_CNT_W -1 downto 0);
+    signal ext_mfb_meta_arr            : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_PCIE_ADDR_W+META_CHAN_NUM_W+META_BE_W+META_BYTE_CNT_W+1 -1 downto 0);
+    signal ext_mfb_meta                : std_logic_vector(PCIE_CQ_MFB_REGIONS*           (META_PCIE_ADDR_W+META_CHAN_NUM_W+META_BE_W+META_BYTE_CNT_W+1)-1 downto 0);
+
     signal ext_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
     signal ext_mfb_sof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
     signal ext_mfb_eof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
@@ -393,6 +400,19 @@ begin
             USR_MFB_SRC_RDY => ext_mfb_src_rdy,
             USR_MFB_DST_RDY => ext_mfb_dst_rdy);
 
+        ext_mfb_meta_byte_cnt_arr   <= slv_array_deser(ext_mfb_meta_byte_cnt  , PCIE_CQ_MFB_REGIONS);
+        ext_mfb_meta_byte_en_arr    <= slv_array_deser(ext_mfb_meta_byte_en   , PCIE_CQ_MFB_REGIONS);
+        ext_mfb_meta_chan_num_arr   <= slv_array_deser(ext_mfb_meta_chan_num  , PCIE_CQ_MFB_REGIONS);
+        ext_mfb_meta_pcie_addr_arr  <= slv_array_deser(ext_mfb_meta_pcie_addr , PCIE_CQ_MFB_REGIONS);
+        ext_mfb_meta_g : for pr in 0 to PCIE_CQ_MFB_REGIONS-1 generate
+            ext_mfb_meta_arr(pr) <= ext_mfb_meta_byte_cnt_arr (pr) &
+                                    ext_mfb_meta_byte_en_arr  (pr) &
+                                    ext_mfb_meta_chan_num_arr (pr) &
+                                    ext_mfb_meta_pcie_addr_arr(pr) &
+                                    ext_mfb_meta_is_dma_hdr   (pr);
+        end generate;
+        ext_mfb_meta <= slv_array_ser(ext_mfb_meta_arr);
+
     tx_dma_chan_start_stop_ctrl_i : entity work.TX_DMA_CHAN_START_STOP_CTRL
         generic map (
             DEVICE   => DEVICE,
@@ -410,7 +430,7 @@ begin
             RESET => RESET,
 
             PCIE_MFB_DATA    => ext_mfb_data,
-            PCIE_MFB_META    => ext_mfb_meta_byte_cnt & ext_mfb_meta_byte_en & ext_mfb_meta_chan_num & ext_mfb_meta_pcie_addr & ext_mfb_meta_is_dma_hdr,
+            PCIE_MFB_META    => ext_mfb_meta,
             PCIE_MFB_SOF     => ext_mfb_sof,
             PCIE_MFB_EOF     => ext_mfb_eof,
             PCIE_MFB_SOF_POS => ext_mfb_sof_pos,
