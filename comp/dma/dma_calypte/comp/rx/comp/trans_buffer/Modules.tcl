@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+lappend MOD "$ENTITY_BASE/skid_buffer.vhd"
 lappend MOD "$ENTITY_BASE/rx_dma_trans_buffer.vhd"
 
 lappend PACKAGES "$OFM_PATH/comp/base/pkg/math_pack.vhd"
