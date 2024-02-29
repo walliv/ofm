@@ -179,17 +179,17 @@ begin
                         recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
                         buff_tx_mfb_src_rdy_nst <= '1';
 
-                    elsif (RX_MFB_EOF = '1' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
+                    -- elsif (RX_MFB_EOF = '1' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
 
-                        packing_fsm_nst <= S_WAIT;
+                    --     packing_fsm_nst <= S_WAIT;
 
-                        recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
-                        buff_tx_mfb_src_rdy_nst <= '1';
+                    --     recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
+                    --     buff_tx_mfb_src_rdy_nst <= '1';
 
-                    elsif (RX_MFB_EOF = '0' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
-                        packing_fsm_nst <= S_WAIT;
+                    -- elsif (RX_MFB_EOF = '0' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
+                    --     packing_fsm_nst <= S_WAIT;
 
-                        buff_tx_mfb_src_rdy_nst <= '1';
+                    --     buff_tx_mfb_src_rdy_nst <= '1';
                     end if;
                 end if;
 
@@ -270,17 +270,17 @@ begin
                             recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
                             buff_tx_mfb_src_rdy_nst <= '1';
 
-                        elsif (RX_MFB_EOF = '1' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
+                        -- elsif (RX_MFB_EOF = '1' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
 
-                            packing_fsm_nst <= S_WAIT;
+                        --     packing_fsm_nst <= S_WAIT;
 
-                            recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
-                            buff_tx_mfb_src_rdy_nst <= '1';
+                        --     recalc_eof_pos_nst      <= segment_ptr_pst & unsigned(RX_MFB_EOF_POS);
+                        --     buff_tx_mfb_src_rdy_nst <= '1';
 
-                        elsif (RX_MFB_EOF = '0' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
-                            packing_fsm_nst <= S_WAIT;
+                        -- elsif (RX_MFB_EOF = '0' and segment_ptr_pst = (BUFFER_DEPTH - 1)) then
+                        --     packing_fsm_nst <= S_WAIT;
 
-                            buff_tx_mfb_src_rdy_nst <= '1';
+                        --     buff_tx_mfb_src_rdy_nst <= '1';
                         end if;
                     else
                         packing_fsm_nst <= S_IDLE;
