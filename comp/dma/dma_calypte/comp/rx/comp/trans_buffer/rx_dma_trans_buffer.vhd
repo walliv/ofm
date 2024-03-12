@@ -26,7 +26,9 @@ entity RX_DMA_TRANS_BUFFER is
         -- =========================================================================================
         RX_REGION_SIZE : integer := 1;
         RX_BLOCK_SIZE  : integer := 4*8;
-        RX_ITEM_WIDTH  : integer := 8
+        RX_ITEM_WIDTH  : integer := 8;
+
+        REG_OUT_EN     : boolean := FALSE
         );
 
     port (
@@ -294,7 +296,7 @@ begin
         generic map (
             DATA_WIDTH => TX_MFB_DATA'length + 1 + 1 + recalc_eof_pos_pst'length,
             STAGES     => 1,
-            FAKE_BUFF  => FALSE)
+            FAKE_BUFF  => not REG_OUT_EN)
         port map (
             CLK => CLK,
             RST => RST,
