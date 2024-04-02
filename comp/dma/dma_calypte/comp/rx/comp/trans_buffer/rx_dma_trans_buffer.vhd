@@ -28,7 +28,7 @@ entity RX_DMA_TRANS_BUFFER is
         RX_BLOCK_SIZE  : integer := 4*8;
         RX_ITEM_WIDTH  : integer := 8;
 
-        REG_OUT_EN     : boolean := FALSE
+        REG_OUT_EN     : boolean := TRUE
         );
 
     port (
