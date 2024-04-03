@@ -136,12 +136,12 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal rd_en_pch                : slv_array_t(MFB_REGIONS - 1 downto 0)(CHANNELS - 1 downto 0);
 
     -- Meta signal for whole MFB word
-    signal pcie_meta_be_per_region             : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH/8 - 1 downto 0);
+    signal pcie_meta_be_per_port  : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH/8 - 1 downto 0);
 
     -- Input BRAM registers - what about the address?
-    signal wr_be_bram_demux_reg       : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_addr_bram_by_shift_reg     : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
-    signal wr_data_bram_shifter_reg     : slv_array_2d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
+    signal wr_be_bram_demux_reg      : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_addr_bram_by_shift_reg : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_data_bram_shifter_reg  : slv_array_2d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
     -- Input register
     signal pcie_mfb_data_inp_reg    : slv_array_t(REG_NUM downto 0)(PCIE_MFB_DATA'range);
@@ -164,12 +164,13 @@ begin
         input_shift_reg_p: process(CLK) is
         begin    
             if rising_edge(CLK) then
-                pcie_mfb_data_inp_reg   (i + 1) <= pcie_mfb_data_inp_reg   (i);
-                pcie_mfb_meta_inp_reg   (i + 1) <= pcie_mfb_meta_inp_reg   (i);
-                pcie_mfb_sof_inp_reg    (i + 1) <= pcie_mfb_sof_inp_reg    (i);
-                pcie_mfb_src_rdy_inp_reg(i + 1) <= pcie_mfb_src_rdy_inp_reg(i);
                 if RESET = '1' then
                     pcie_mfb_src_rdy_inp_reg(i + 1) <= '0';
+                else
+                    pcie_mfb_data_inp_reg   (i + 1) <= pcie_mfb_data_inp_reg   (i);
+                    pcie_mfb_meta_inp_reg   (i + 1) <= pcie_mfb_meta_inp_reg   (i);
+                    pcie_mfb_sof_inp_reg    (i + 1) <= pcie_mfb_sof_inp_reg    (i);
+                    pcie_mfb_src_rdy_inp_reg(i + 1) <= pcie_mfb_src_rdy_inp_reg(i);
                 end if;
             end if;
         end process;
@@ -225,17 +226,17 @@ begin
     -- =============================================================================================
     -- This process selects which bytes are enabled in which BS based on the SOF status in the second region
     meta_be_g: if (MFB_REGIONS = 1) generate
-        pcie_meta_be_per_region(0) <= pcie_mfb_meta_arr(0)(META_BE);
+        pcie_meta_be_per_port(0) <= pcie_mfb_meta_arr(0)(META_BE);
     else generate
         meta_sel_p: process(all)
         begin
             if (pcie_mfb_sof_inp_reg(REG_NUM)(1) = '1') then
-                pcie_meta_be_per_region(0) <= (META_BE_W - 1 downto 0 => '0') & pcie_mfb_meta_arr(0)(META_BE);
-                pcie_meta_be_per_region(1) <= pcie_mfb_meta_arr(1)(META_BE) & (META_BE_W - 1 downto 0 => '0');
+                pcie_meta_be_per_port(0) <= (META_BE_W -1 downto 0 => '0') & pcie_mfb_meta_arr(0)(META_BE);
+                pcie_meta_be_per_port(1) <= pcie_mfb_meta_arr(1)(META_BE) & (META_BE_W -1 downto 0 => '0');
             else 
                 -- The problem is that we only get half the information in metadata for each region
-                pcie_meta_be_per_region(0) <= pcie_mfb_meta_arr(1)(META_BE) & pcie_mfb_meta_arr(0)(META_BE);
-                pcie_meta_be_per_region(1) <= (others => '0');
+                pcie_meta_be_per_port(0) <= pcie_mfb_meta_arr(1)(META_BE) & pcie_mfb_meta_arr(0)(META_BE);
+                pcie_meta_be_per_port(1) <= (others => '0');
             end if;
         end process;
     end generate;
@@ -248,7 +249,7 @@ begin
     -- but when it continues, then select shift from the counter of addresses.
 
     -- The previous "2 downto 0" is specification of address - now generic for more regions
-    -- The address system here is divided into two parts -> due to the BRAM configuration
+    -- The address system here is divided into two parts due to the dual-port BRAM configuration
     wr_bshifter_0_ctrl_p: process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
     begin
@@ -263,7 +264,7 @@ begin
                 wr_shift_sel(0)         <= std_logic_vector(addr_cntr_pst(log2(MFB_DWORDS) - 1 downto 0));
             end if;
         end if;
-    end process;        
+    end process;
 
     -- Data - Port A
     wr_data_barrel_shifter_0_i: entity work.BARREL_SHIFTER_GEN
@@ -286,7 +287,7 @@ begin
             SHIFT_LEFT => TRUE
         )
         port map (
-            DATA_IN  => pcie_meta_be_per_region(0),
+            DATA_IN  => pcie_meta_be_per_port(0),
             DATA_OUT => wr_be_bram_bshifter(0),
             SEL      => wr_shift_sel(0)
         );
@@ -334,7 +335,7 @@ begin
                 SHIFT_LEFT => TRUE
             )
             port map (
-                DATA_IN  => pcie_meta_be_per_region(1),
+                DATA_IN  => pcie_meta_be_per_port(1),
                 DATA_OUT => wr_be_bram_bshifter(1),
                 SEL      => wr_shift_sel(1)
             );        
@@ -381,7 +382,7 @@ begin
                     if (i < addr_cntr_pst(log2(MFB_DWORDS) - 1 downto 0)) then
                         wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS))) + 1);
                     end if;
-                end loop;                        
+                end loop;
             end if;
         end if;
     end process;
@@ -469,7 +470,7 @@ begin
     end process;
 
     -- =============================================================================================
-    -- Input registers - BRAM
+    -- Registers between BARREL_SHIFTERs and BRAMs
     -- =============================================================================================
     --slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0) <= slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     wr_be_bram_demux_reg     (0) <= wr_be_bram_demux;
@@ -510,8 +511,7 @@ begin
                         COMMON_CLOCK   => TRUE,
                         OUTPUT_REG     => FALSE,
                         METADATA_WIDTH => 0,
-                        DEVICE         => DEVICE
-                    )
+                        DEVICE         => DEVICE)
                     port map (
                         WR_CLK  => CLK,
                         WR_RST  => RESET,
@@ -529,8 +529,7 @@ begin
                         RD_ADDR     => rd_addr_bram_by_shift(i),
                         RD_DATA     => rd_data_bram(0)(j)(i*8 +7 downto i*8),
                         RD_META_OUT => open,
-                        RD_DATA_VLD => open
-                    );
+                        RD_DATA_VLD => open);
             end generate;
         end generate;
             
@@ -549,6 +548,7 @@ begin
         -- Convert address of a DWORD to an address of each individual byte
         -- This is used for address multiplexing
         addr_multi_regions_g : for i in 0 to MFB_REGIONS - 1 generate
+            -- Iterate over bytes of a region
             addr_multi_bytes_g : for j in 0 to ((MFB_LENGTH/8) -1) generate
                 wr_addr_bram_by_multi(i)(j) <= wr_addr_bram_by_shift_reg(REG_NUM)(i)(j/4);
             end generate;
