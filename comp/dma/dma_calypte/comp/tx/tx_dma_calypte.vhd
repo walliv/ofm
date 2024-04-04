@@ -177,10 +177,10 @@ architecture FULL of TX_DMA_CALYPTE is
     constant META_BYTE_CNT_O   : natural := META_BE_O + META_BE_W;
 
     subtype META_IS_DMA_HDR is natural range META_IS_DMA_HDR_O + META_IS_DMA_HDR_W -1 downto META_IS_DMA_HDR_O;
-    subtype META_PCIE_ADDR is natural range META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
-    subtype META_CHAN_NUM is natural range META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
-    subtype META_BE is natural range META_BE_O + META_BE_W -1 downto META_BE_O;
-    subtype META_BYTE_CNT is natural range META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto META_BYTE_CNT_O;
+    subtype META_PCIE_ADDR  is natural range   META_PCIE_ADDR_O + META_PCIE_ADDR_W -1 downto META_PCIE_ADDR_O;
+    subtype META_CHAN_NUM   is natural range     META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
+    subtype META_BE         is natural range                 META_BE_O + META_BE_W -1 downto META_BE_O;
+    subtype META_BYTE_CNT   is natural range     META_BYTE_CNT_O + META_BYTE_CNT_W -1 downto META_BYTE_CNT_O;
 
     -- =============================================================================================
     -- Interconnect signals
