@@ -209,20 +209,8 @@ architecture FULL of TX_DMA_CALYPTE is
     signal upd_hhp_data : std_logic_vector(DMA_HDR_POINTER_WIDTH -1 downto 0);
     signal upd_hhp_en   : std_logic;
 
-    signal ext_mfb_meta_is_dma_hdr : std_logic_vector(PCIE_CQ_MFB_REGIONS - 1 downto 0);
-    signal ext_mfb_meta_pcie_addr  : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_PCIE_ADDR_W -1 downto 0);
-    signal ext_mfb_meta_chan_num   : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_CHAN_NUM_W -1 downto 0);
-    signal ext_mfb_meta_byte_en    : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BE_W -1 downto 0);
-    signal ext_mfb_meta_byte_cnt   : std_logic_vector(PCIE_CQ_MFB_REGIONS*META_BYTE_CNT_W -1 downto 0);
-
-    signal ext_mfb_meta_pcie_addr_arr  : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_PCIE_ADDR_W -1 downto 0);
-    signal ext_mfb_meta_chan_num_arr   : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_CHAN_NUM_W -1 downto 0);
-    signal ext_mfb_meta_byte_en_arr    : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_BE_W -1 downto 0);
-    signal ext_mfb_meta_byte_cnt_arr   : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_BYTE_CNT_W -1 downto 0);
-    signal ext_mfb_meta_arr            : slv_array_t     (PCIE_CQ_MFB_REGIONS-1 downto 0)(META_PCIE_ADDR_W+META_CHAN_NUM_W+META_BE_W+META_BYTE_CNT_W+1 -1 downto 0);
-    signal ext_mfb_meta                : std_logic_vector(PCIE_CQ_MFB_REGIONS*           (META_PCIE_ADDR_W+META_CHAN_NUM_W+META_BE_W+META_BYTE_CNT_W+1)-1 downto 0);
-
     signal ext_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
+    signal ext_mfb_meta    : std_logic_vector(PCIE_CQ_MFB_REGIONS*(META_BYTE_CNT_O+META_BYTE_CNT_W)-1 downto 0);
     signal ext_mfb_sof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
     signal ext_mfb_eof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
     signal ext_mfb_sof_pos : std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0);
@@ -386,32 +374,14 @@ begin
             PCIE_MFB_SRC_RDY => PCIE_CQ_MFB_SRC_RDY,
             PCIE_MFB_DST_RDY => PCIE_CQ_MFB_DST_RDY,
 
-            USR_MFB_META_IS_DMA_HDR => ext_mfb_meta_is_dma_hdr,
-            USR_MFB_META_PCIE_ADDR  => ext_mfb_meta_pcie_addr,
-            USR_MFB_META_CHAN_NUM   => ext_mfb_meta_chan_num,
-            USR_MFB_META_BYTE_EN    => ext_mfb_meta_byte_en,
-            USR_MFB_META_BYTE_CNT   => ext_mfb_meta_byte_cnt,
-
             USR_MFB_DATA    => ext_mfb_data,
+            USR_MFB_META    => ext_mfb_meta,
             USR_MFB_SOF     => ext_mfb_sof,
             USR_MFB_EOF     => ext_mfb_eof,
             USR_MFB_SOF_POS => ext_mfb_sof_pos,
             USR_MFB_EOF_POS => ext_mfb_eof_pos,
             USR_MFB_SRC_RDY => ext_mfb_src_rdy,
             USR_MFB_DST_RDY => ext_mfb_dst_rdy);
-
-        ext_mfb_meta_byte_cnt_arr   <= slv_array_deser(ext_mfb_meta_byte_cnt  , PCIE_CQ_MFB_REGIONS);
-        ext_mfb_meta_byte_en_arr    <= slv_array_deser(ext_mfb_meta_byte_en   , PCIE_CQ_MFB_REGIONS);
-        ext_mfb_meta_chan_num_arr   <= slv_array_deser(ext_mfb_meta_chan_num  , PCIE_CQ_MFB_REGIONS);
-        ext_mfb_meta_pcie_addr_arr  <= slv_array_deser(ext_mfb_meta_pcie_addr , PCIE_CQ_MFB_REGIONS);
-        ext_mfb_meta_g : for pr in 0 to PCIE_CQ_MFB_REGIONS-1 generate
-            ext_mfb_meta_arr(pr) <= ext_mfb_meta_byte_cnt_arr (pr) &
-                                    ext_mfb_meta_byte_en_arr  (pr) &
-                                    ext_mfb_meta_chan_num_arr (pr) &
-                                    ext_mfb_meta_pcie_addr_arr(pr) &
-                                    ext_mfb_meta_is_dma_hdr   (pr);
-        end generate;
-        ext_mfb_meta <= slv_array_ser(ext_mfb_meta_arr);
 
     tx_dma_chan_start_stop_ctrl_i : entity work.TX_DMA_CHAN_START_STOP_CTRL
         generic map (
