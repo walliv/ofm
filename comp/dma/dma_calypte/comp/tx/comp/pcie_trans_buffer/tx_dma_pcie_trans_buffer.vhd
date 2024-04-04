@@ -531,10 +531,10 @@ begin
                         port map (
                             WR_CLK      => CLK,
                             WR_RST      => RESET,
-                            WR_EN       => wr_be_bram_reg_num(REG_NUM)(0)(j)(i),
+                            WR_EN       => wr_be_bram_demux_reg(REG_NUM)(0)(j)(i),
                             WR_BE       => (others => '1'),
-                            WR_ADDR     => wr_addr_bram_reg_num(REG_NUM)(0)(i/4),
-                            WR_DATA     => wr_data_bram_reg_num(REG_NUM)(0)(i*8 +7 downto i*8),
+                            WR_ADDR     => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
+                            WR_DATA     => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
 
                             RD_CLK      => CLK,
                             RD_RST      => RESET,
@@ -542,7 +542,7 @@ begin
                             RD_PIPE_EN  => rd_en_bram_demux(j),
                             RD_META_IN  => (others => '0'),
                             RD_ADDR     => rd_addr_bram_by_shift(i),
-                            RD_DATA     => rd_data_bram(j)(i*8 +7 downto i*8),
+                            RD_DATA     => rd_data_bram(0)(j)(i*8 +7 downto i*8),
                             RD_META_OUT => open,
                             RD_DATA_VLD => open);
 
@@ -558,11 +558,11 @@ begin
                             DEVICE             => DEVICE)
                         port map (
                             CLK     => CLK,
-                            WR_EN   => wr_be_bram_reg_num(REG_NUM)(j)(i),
-                            WR_ADDR => wr_addr_bram_reg_num(REG_NUM)(i/4),
-                            WR_DATA => wr_data_bram_reg_num(REG_NUM)(i*8 +7 downto i*8),
+                            WR_EN   => wr_be_bram_demux_reg(REG_NUM)(0)(j)(i),
+                            WR_ADDR => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
+                            WR_DATA => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
                             RD_ADDR => rd_addr_bram_by_shift(i),
-                            RD_DATA => rd_data_bram(j)(i*8 +7 downto i*8));
+                            RD_DATA => rd_data_bram(0)(j)(i*8 +7 downto i*8));
                 end generate;
             end generate;
         end generate;
