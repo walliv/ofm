@@ -531,7 +531,7 @@ begin
                         port map (
                             WR_CLK      => CLK,
                             WR_RST      => RESET,
-                            WR_EN       => wr_be_bram_demux_reg(REG_NUM)(0)(j)(i),
+                            WR_EN       => wr_be_bram_demux_reg(REG_NUM)(j)(0)(i),
                             WR_BE       => (others => '1'),
                             WR_ADDR     => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
                             WR_DATA     => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
@@ -558,7 +558,7 @@ begin
                             DEVICE             => DEVICE)
                         port map (
                             CLK     => CLK,
-                            WR_EN   => wr_be_bram_demux_reg(REG_NUM)(0)(j)(i),
+                            WR_EN   => wr_be_bram_demux_reg(REG_NUM)(j)(0)(i),
                             WR_ADDR => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
                             WR_DATA => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
                             RD_ADDR => rd_addr_bram_by_shift(i),
