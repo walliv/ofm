@@ -152,9 +152,6 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     signal disp_buff_do     : std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
 
     -- Input
-    signal pcie_buff_chan   : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal pcie_buff_data   : std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-    signal pcie_buff_addr   : std_logic_vector(DATA_POINTER_WIDTH -1 downto 0);
     signal pcie_buff_en     : std_logic;
 
     signal pcie_buff_empty  : std_logic;
@@ -168,156 +165,148 @@ begin
     -- =============================================================================================
     -- Logic + FIFO Buffer (IF GENERATE)
     -- =============================================================================================
-    bram_sel_g : if PCIE_MFB_REGIONS = 2 generate 
-        pkt_req_fsm_reg_p : process (CLK) is
-        begin
-            if (rising_edge(CLK)) then
-                if (RESET = '1') then
-                    req_fsm_pst   <= S_IDLE;
-                    addr_cntr_q   <= (others => '0');
-                    byte_cntr_q   <= (others => '0');
-                else
-                    req_fsm_pst   <= req_fsm_nst;
-                    addr_cntr_q   <= addr_cntr_d;
-                    byte_cntr_q   <= byte_cntr_d;
-                end if;
-            end if;
-        end process;
+    -- bram_sel_g : if PCIE_MFB_REGIONS = 2 generate
+    --     pkt_req_fsm_reg_p : process (CLK) is
+    --     begin
+    --         if (rising_edge(CLK)) then
+    --             if (RESET = '1') then
+    --                 req_fsm_pst   <= S_IDLE;
+    --                 addr_cntr_q   <= (others => '0');
+    --                 byte_cntr_q   <= (others => '0');
+    --             else
+    --                 req_fsm_pst   <= req_fsm_nst;
+    --                 addr_cntr_q   <= addr_cntr_d;
+    --                 byte_cntr_q   <= byte_cntr_d;
+    --             end if;
+    --         end if;
+    --     end process;
 
-        pkt_req_fsm_nst_logic_p : process (all) is
-            variable dma_hdr_frame_ptr_v    : unsigned(DMA_FRAME_PTR_W -1 downto 0);
-            variable dma_hdr_frame_length_v : unsigned(DMA_FRAME_LENGTH_W -1 downto 0);
-        begin
-            req_fsm_nst       <= req_fsm_pst;
+    --     pkt_req_fsm_nst_logic_p : process (all) is
+    --         variable dma_hdr_frame_ptr_v    : unsigned(DMA_FRAME_PTR_W -1 downto 0);
+    --         variable dma_hdr_frame_length_v : unsigned(DMA_FRAME_LENGTH_W -1 downto 0);
+    --     begin
+    --         req_fsm_nst       <= req_fsm_pst;
 
-            dma_hdr_src_rdy   <= '0';
-            req_fifo_en       <= '0';
+    --         dma_hdr_src_rdy   <= '0';
+    --         req_fifo_en       <= '0';
 
-            addr_cntr_d       <= addr_cntr_q;
-            byte_cntr_d       <= byte_cntr_q;
+    --         addr_cntr_d       <= addr_cntr_q;
+    --         byte_cntr_d       <= byte_cntr_q;
 
-            HDR_BUFF_DST_RDY  <= '0';
+    --         HDR_BUFF_DST_RDY  <= '0';
 
-            BUFF_RD_ADDR      <= (others => '0');
-            BUFF_RD_EN        <= '0';
-            BUFF_RD_CHAN      <= pcie_buff_chan;
+    --         BUFF_RD_ADDR      <= (others => '0');
+    --         BUFF_RD_EN        <= '0';
+    --         BUFF_RD_CHAN      <= pcie_buff_chan;
 
-            dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
-            dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
+    --         dma_hdr_frame_ptr_v    := unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR));
+    --         dma_hdr_frame_length_v := unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH));
 
-            case req_fsm_pst is
-                when S_IDLE    =>
-                    if (HDR_BUFF_SRC_RDY = '1') then
-                        if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
-                            -- Data request
-                            BUFF_RD_ADDR  <= std_logic_vector(dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range));
-                            BUFF_RD_EN    <= '1';
+    --         case req_fsm_pst is
+    --             when S_IDLE    =>
+    --                 if (HDR_BUFF_SRC_RDY = '1') then
+    --                     if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
+    --                         -- Data request
+    --                         BUFF_RD_ADDR  <= std_logic_vector(dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range));
+    --                         BUFF_RD_EN    <= '1';
 
-                            -- Save current data
-                            addr_cntr_d   <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
-                            byte_cntr_d   <= resize(dma_hdr_frame_length_v, byte_cntr_d'length);
+    --                         -- Save current data
+    --                         addr_cntr_d   <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
+    --                         byte_cntr_d   <= resize(dma_hdr_frame_length_v, byte_cntr_d'length);
 
-                            -- Should be alright even though the packet will fit into MFB_WORD
-                            req_fsm_nst   <= S_WR_FIFO;
-                        else 
-                            -- Discard header
-                            HDR_BUFF_DST_RDY <= '1';
-                        end if;
-                    end if;
+    --                         -- Should be alright even though the packet will fit into MFB_WORD
+    --                         req_fsm_nst   <= S_WR_FIFO;
+    --                     else
+    --                         -- Discard header
+    --                         HDR_BUFF_DST_RDY <= '1';
+    --                     end if;
+    --                 end if;
 
-                when S_WR_FIFO =>
-                    -- Data request
-                    BUFF_RD_EN      <= '1';
-                    BUFF_RD_ADDR    <= std_logic_vector(addr_cntr_q);
+    --             when S_WR_FIFO =>
+    --                 -- Data request
+    --                 BUFF_RD_EN      <= '1';
+    --                 BUFF_RD_ADDR    <= std_logic_vector(addr_cntr_q);
 
-                    -- Received data are valid - new address can be set
-                    if (BUFF_RD_DATA_VLD = '1') then
-                        BUFF_RD_ADDR  <= std_logic_vector(addr_cntr_q + (USR_MFB_DATA'length /8));
+    --                 -- Received data are valid - new address can be set
+    --                 if (BUFF_RD_DATA_VLD = '1') then
+    --                     BUFF_RD_ADDR  <= std_logic_vector(addr_cntr_q + (USR_MFB_DATA'length /8));
 
-                        -- Update header data
-                        addr_cntr_d   <= addr_cntr_q + (USR_MFB_DATA'length /8);
-                        byte_cntr_d   <= byte_cntr_q - (USR_MFB_DATA'length /8);
-                        
-                        -- There are no data left
-                        if (byte_cntr_q <= (USR_MFB_DATA'length /8)) then
-                            req_fsm_nst <= S_RD_DLY;
-                        end if;
-                    end if;
-                
-                -- The minimal delay when the incoming packet is too small
-                when S_RD_DLY  =>
-                    req_fsm_nst <= S_RD_FIFO;
+    --                     -- Update header data
+    --                     addr_cntr_d   <= addr_cntr_q + (USR_MFB_DATA'length /8);
+    --                     byte_cntr_d   <= byte_cntr_q - (USR_MFB_DATA'length /8);
 
-                -- Delay: WR and DI have no delay, FULL, DO and EMPTY is pre calculated and has no delay.
-                when S_RD_FIFO =>
-                    -- It takes two clocks
-                    dma_hdr_src_rdy <= '1';
-                    req_fifo_en     <= '1';
+    --                     -- There are no data left
+    --                     if (byte_cntr_q <= (USR_MFB_DATA'length /8)) then
+    --                         req_fsm_nst <= S_RD_DLY;
+    --                     end if;
+    --                 end if;
 
-                    if pcie_buff_empty = '1' then
-                        req_fsm_nst         <= S_IDLE;
-                        HDR_BUFF_DST_RDY    <= '1';
-                    end if;
+    --             -- The minimal delay when the incoming packet is too small
+    --             when S_RD_DLY  =>
+    --                 req_fsm_nst <= S_RD_FIFO;
 
-            end case;
-        end process;
+    --             -- Delay: WR and DI have no delay, FULL, DO and EMPTY is pre calculated and has no delay.
+    --             when S_RD_FIFO =>
+    --                 -- It takes two clocks
+    --                 dma_hdr_src_rdy <= '1';
+    --                 req_fifo_en     <= '1';
 
-        --NOTE:
-        -- Delay: None of 'WR', 'DI', 'FULL', 'DO', 'EMPTY', 'STATUS',
-        -- 'AFULL', or 'AEMPTY' has any delay; however, written data takes at least
-        -- two clock cycles before it can be read.
+    --                 if pcie_buff_empty = '1' then
+    --                     req_fsm_nst         <= S_IDLE;
+    --                     HDR_BUFF_DST_RDY    <= '1';
+    --                 end if;
 
-        disp_buffer_i: entity work.fifox
-        generic map(
-            DATA_WIDTH          => MFB_LENGTH,
-            ITEMS               => (PKT_SIZE_MAX + 1)/(MFB_LENGTH/8),
-            DEVICE              => DEVICE,
-            ALMOST_FULL_OFFSET  => 0,
-            ALMOST_EMPTY_OFFSET => 0
-        )
-        port map(
-            CLK         => CLK,
-            RESET       => RESET,
+    --         end case;
+    --     end process;
 
-            -- Write interface
-            DI          => BUFF_RD_DATA,
-            WR          => BUFF_RD_DATA_VLD,
-            FULL        => open,
-            AFULL       => open,
-            STATUS      => open,
+    --     --NOTE:
+    --     -- Delay: None of 'WR', 'DI', 'FULL', 'DO', 'EMPTY', 'STATUS',
+    --     -- 'AFULL', or 'AEMPTY' has any delay; however, written data takes at least
+    --     -- two clock cycles before it can be read.
 
-            -- Read interface
-            DO          => disp_buff_do,
-            RD          => pcie_buff_en,
-            EMPTY       => pcie_buff_empty,
-            AEMPTY      => open
-        );
+    --     disp_buffer_i: entity work.fifox
+    --     generic map(
+    --         DATA_WIDTH          => MFB_LENGTH,
+    --         ITEMS               => (PKT_SIZE_MAX + 1)/(MFB_LENGTH/8),
+    --         DEVICE              => DEVICE,
+    --         ALMOST_FULL_OFFSET  => 0,
+    --         ALMOST_EMPTY_OFFSET => 0
+    --     )
+    --     port map(
+    --         CLK         => CLK,
+    --         RESET       => RESET,
 
-        -- Output register to simulate BRAM behaviour
-        fifo_out_reg_p: process(CLK) is
-        begin
-            if rising_edge(CLK) then
-                pcie_buff_data  <= disp_buff_do;
-            end if;
-        end process;
+    --         -- Write interface
+    --         DI          => BUFF_RD_DATA,
+    --         WR          => BUFF_RD_DATA_VLD,
+    --         FULL        => open,
+    --         AFULL       => open,
+    --         STATUS      => open,
 
-    else generate
+    --         -- Read interface
+    --         DO          => disp_buff_do,
+    --         RD          => pcie_buff_en,
+    --         EMPTY       => pcie_buff_empty,
+    --         AEMPTY      => open
+    --     );
 
-    --bram_sel_one_region_g : if PCIE_MFB_REGIONS = 1 generate
-        -- PCIe Buffer
-        pcie_buff_data   <= BUFF_RD_DATA;
-        BUFF_RD_CHAN     <= pcie_buff_chan;
-        BUFF_RD_ADDR     <= pcie_buff_addr;
-        BUFF_RD_EN       <= pcie_buff_en;
-        
-        dma_hdr_src_rdy  <= HDR_BUFF_SRC_RDY;
-        HDR_BUFF_DST_RDY <= dma_hdr_dst_rdy;
-    end generate;
+    --     -- Output register to simulate BRAM behaviour
+    --     fifo_out_reg_p: process(CLK) is
+    --     begin
+    --         if rising_edge(CLK) then
+    --             pcie_buff_data  <= disp_buff_do;
+    --         end if;
+    --     end process;
+
+    -- else generate
+
+    -- dma_hdr_src_rdy  <= HDR_BUFF_SRC_RDY;
+    -- HDR_BUFF_DST_RDY <= dma_hdr_dst_rdy;
+    -- end generate;
 
     -- =============================================================================================
     -- Output Logic
     -- =============================================================================================
-
     pkt_dispatch_fsm_reg_p : process (CLK) is
     begin
         if (rising_edge(CLK)) then
@@ -378,8 +367,8 @@ begin
 
         dma_hdr_dst_rdy <= '0';
 
-        pcie_buff_addr <= std_logic_vector(addr_cntr_pst);
-        pcie_buff_en   <= '0';
+        BUFF_RD_ADDR <= std_logic_vector(addr_cntr_pst);
+        BUFF_RD_EN   <= '0';
 
         PKT_SENT_INC <= '0';
         UPD_HDP_EN   <= '0';
@@ -399,18 +388,18 @@ begin
                         disp_fsm_mfb_sof     <= "1";
                         disp_fsm_mfb_src_rdy <= '1';
 
-                        pcie_buff_addr <= std_logic_vector(dma_hdr_frame_ptr_v(pcie_buff_addr'range));
-                        pcie_buff_en   <= '1';
+                        BUFF_RD_ADDR <= std_logic_vector(dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range));
+                        BUFF_RD_EN   <= '1';
 
                         -- When the packet, according to its length, fits in the output word, then
                         -- assign EOF and do not count next address for the reading.
                         if (dma_hdr_frame_length_v <= (USR_MFB_DATA'length /8)) then
-                            addr_cntr_nst        <= dma_hdr_frame_ptr_v(pcie_buff_addr'range);
+                            addr_cntr_nst        <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
                             disp_fsm_mfb_eof     <= "1";
                             -- take only the lower bits from the frame length
                             disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
                         else
-                            addr_cntr_nst <= dma_hdr_frame_ptr_v(pcie_buff_addr'range) + (USR_MFB_DATA'length /8);
+                            addr_cntr_nst <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range) + (USR_MFB_DATA'length /8);
                             byte_cntr_nst <= resize(dma_hdr_frame_length_v, byte_cntr_nst'length) - (USR_MFB_DATA'length /8);
                         end if;
                     end if;
@@ -423,7 +412,7 @@ begin
                 disp_fsm_mfb_src_rdy <= '1';
                 
                 -- Change to common signal
-                pcie_buff_en         <= '1';
+                BUFF_RD_EN         <= '1';
 
                 if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
                     disp_fsm_mfb_eof     <= "1";
@@ -438,7 +427,7 @@ begin
         end case;
     end process;
 
-    pcie_buff_chan <= HDR_BUFF_CHAN;
+    BUFF_RD_CHAN <= HDR_BUFF_CHAN;
 
     PKT_SENT_CHAN  <= HDR_BUFF_CHAN;
     PKT_SENT_BYTES <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(PKT_SENT_BYTES'range);
@@ -462,7 +451,7 @@ begin
                 USR_MFB_EOF_POS <= (others => '0');
                 USR_MFB_SRC_RDY <= '0';
             elsif (USR_MFB_DST_RDY = '1') then
-                USR_MFB_SOF     <= disp_fsm_mfb_sof;
+
                 USR_MFB_EOF     <= disp_fsm_mfb_eof;
                 USR_MFB_EOF_POS <= disp_fsm_mfb_eof_pos;
                 USR_MFB_SRC_RDY <= disp_fsm_mfb_src_rdy;
@@ -474,7 +463,7 @@ begin
     USR_MFB_META_CHAN     <= HDR_BUFF_CHAN;
     USR_MFB_META_PKT_SIZE <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(USR_MFB_META_PKT_SIZE'range);
 
-    USR_MFB_DATA    <= pcie_buff_data when mfb_dst_rdy_reg = '1' else buff_rd_data_reg;
+    USR_MFB_DATA    <= BUFF_RD_DATA when mfb_dst_rdy_reg = '1' else buff_rd_data_reg;
     USR_MFB_SOF_POS <= (others => '0');
 
     mfb_dst_rdy_reg_p : process (CLK) is
@@ -490,7 +479,7 @@ begin
             if (RESET = '1') then
                 buff_rd_data_reg <= (others => '0');
             elsif (mfb_dst_rdy_reg = '1') then
-                buff_rd_data_reg <= pcie_buff_data;
+                buff_rd_data_reg <= BUFF_RD_DATA;
             end if;
         end if;
     end process;
