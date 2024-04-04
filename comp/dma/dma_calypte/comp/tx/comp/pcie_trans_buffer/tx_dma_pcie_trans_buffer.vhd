@@ -511,8 +511,8 @@ begin
     -- =============================================================================================
     -- One region
     sdp_bram_g: if (MFB_REGIONS = 1) generate
-        brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
-            brams_per_byte : for i in 0 to ((MFB_LENGTH/8) -1) generate
+        brams_for_channels_g : for ch in 0 to (CHANNELS -1) generate
+            brams_per_byte : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
                 ram_type_g: if (BUFFER_DEPTH >= 2048) generate
                     sdp_bram_be_i : entity work.SDP_BRAM_BE
                         generic map (
@@ -531,18 +531,18 @@ begin
                         port map (
                             WR_CLK      => CLK,
                             WR_RST      => RESET,
-                            WR_EN       => wr_be_bram_demux_reg(REG_NUM)(j)(0)(i),
+                            WR_EN       => wr_be_bram_demux_reg(REG_NUM)(ch)(0)(wbyte),
                             WR_BE       => (others => '1'),
-                            WR_ADDR     => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
-                            WR_DATA     => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
+                            WR_ADDR     => wr_addr_bram_by_shift_reg(REG_NUM)(0)(wbyte/4),
+                            WR_DATA     => wr_data_bram_shifter_reg(REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
 
                             RD_CLK      => CLK,
                             RD_RST      => RESET,
                             RD_EN       => '1',
-                            RD_PIPE_EN  => rd_en_bram_demux(j),
+                            RD_PIPE_EN  => rd_en_bram_demux(ch),
                             RD_META_IN  => (others => '0'),
-                            RD_ADDR     => rd_addr_bram_by_shift(i),
-                            RD_DATA     => rd_data_bram(0)(j)(i*8 +7 downto i*8),
+                            RD_ADDR     => rd_addr_bram_by_shift(wbyte),
+                            RD_DATA     => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8),
                             RD_META_OUT => open,
                             RD_DATA_VLD => open);
 
@@ -558,11 +558,11 @@ begin
                             DEVICE             => DEVICE)
                         port map (
                             CLK     => CLK,
-                            WR_EN   => wr_be_bram_demux_reg(REG_NUM)(j)(0)(i),
-                            WR_ADDR => wr_addr_bram_by_shift_reg(REG_NUM)(0)(i/4),
-                            WR_DATA => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
-                            RD_ADDR => rd_addr_bram_by_shift(i),
-                            RD_DATA => rd_data_bram(0)(j)(i*8 +7 downto i*8));
+                            WR_EN   => wr_be_bram_demux_reg(REG_NUM)(ch)(0)(wbyte),
+                            WR_ADDR => wr_addr_bram_by_shift_reg(REG_NUM)(0)(wbyte/4),
+                            WR_DATA => wr_data_bram_shifter_reg(REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
+                            RD_ADDR => rd_addr_bram_by_shift(wbyte),
+                            RD_DATA => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8));
                 end generate;
             end generate;
         end generate;
