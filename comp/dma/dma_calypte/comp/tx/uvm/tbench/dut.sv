@@ -88,6 +88,9 @@ module DUT(
         .PCIE_CQ_MFB_SRC_RDY       (mfb_rx.SRC_RDY),
         .PCIE_CQ_MFB_DST_RDY       (mfb_rx.DST_RDY),
 
+        .ST_SP_DBG_CHAN(),
+        .ST_SP_DBG_META(),
+
         .PCIE_CC_MFB_DATA          (/* mfb_tx.DATA */),
         .PCIE_CC_MFB_META          (/* mfb_tx.META */),
         .PCIE_CC_MFB_SOF_POS       (/* sof_pos */),
