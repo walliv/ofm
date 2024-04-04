@@ -21,14 +21,6 @@ module DUT(
     logic [$clog2(CHANNELS)-1:0]       channel;
     logic [24-1:0]                     meta;
 
-    // logic [((PCIE_CQ_MFB_REGION_SIZE != 1) ? $clog2(PCIE_CQ_MFB_REGION_SIZE) : 1)-1 : 0] sof_pos;
-    // generate
-    //     if (PCIE_CQ_MFB_REGION_SIZE != 1) begin
-    //         assign sof_pos = mfb_rx.SOF_POS;
-    //     end else
-    //         assign sof_pos = '0;
-    // endgenerate
-
     generate
         //{packet_size, channel, meta} 24 + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS)[CHANNELS]
         assign mfb_tx.META[24 + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS)-1 -: $clog2(PKT_SIZE_MAX+1)] = packet_size[$clog2(PKT_SIZE_MAX+1)-1 -: $clog2(PKT_SIZE_MAX+1)];
