@@ -127,19 +127,19 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal wr_addr_bram_by_multi    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
     -- Read/Write Address - TDP
-    signal rw_addr_bram_by_mux      : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal rw_addr_bram_by_mux      : slv_array_3d_t(CHANNELS - 1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
     -- Read data valid - TDP
     signal rd_data_valid_arr        : std_logic_vector(MFB_REGIONS - 1 downto 0);
 
     -- Read enable per channel
-    signal rd_en_pch                : slv_array_t(MFB_REGIONS - 1 downto 0)(CHANNELS - 1 downto 0);
+    signal rd_en_pch                : slv_array_t(CHANNELS - 1 downto 0)(MFB_REGIONS - 1 downto 0);
 
     -- Meta signal for whole MFB word
     signal pcie_meta_be_per_port  : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH/8 - 1 downto 0);
 
     -- Input BRAM registers - what about the address?
-    signal wr_be_bram_demux_reg      : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_be_bram_demux_reg      : slv_array_3d_t(REG_NUM downto 0)(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_addr_bram_by_shift_reg : slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     signal wr_data_bram_shifter_reg  : slv_array_2d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
@@ -149,7 +149,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal pcie_mfb_sof_inp_reg     : slv_array_t(REG_NUM downto 0)(PCIE_MFB_SOF'range);
     signal pcie_mfb_src_rdy_inp_reg : std_logic_vector(REG_NUM downto 0);
 
-    signal addr_sel                 : std_logic_vector(MFB_REGIONS - 1 downto 0);
+    signal addr_sel                 : slv_array_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0);
 
 begin
     -- =============================================================================================
@@ -472,8 +472,11 @@ begin
     -- =============================================================================================
     -- Registers between BARREL_SHIFTERs and BRAMs
     -- =============================================================================================
-    --slv_array_3d_t(REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0) <= slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    wr_be_bram_demux_reg     (0) <= wr_be_bram_demux;
+    be_to_regs_by_chan_g: for ch in 0 to (CHANNELS -1) generate
+        be_to_regs_by_rgn_g: for rgn in 0 to (MFB_REGIONS -1) generate
+            wr_be_bram_demux_reg(0)(ch)(rgn) <= wr_be_bram_demux(rgn)(ch);
+        end generate;
+    end generate;
     wr_addr_bram_by_shift_reg(0) <= wr_addr_bram_by_shift;
     wr_data_bram_shifter_reg (0) <= wr_data_bram_bshifter;
 
@@ -534,10 +537,10 @@ begin
         end generate;
             
         rd_data_valid_arr       <= (others => '0');
-        addr_sel                <= (others => '0');
+        addr_sel                <= (others => (others => '0'));
         rd_en_pch               <= (others => (others => '0'));
         wr_addr_bram_by_multi   <= (others => (others => (others => '0')));
-        rw_addr_bram_by_mux     <= (others => (others => (others => '0')));
+        rw_addr_bram_by_mux     <= (others => (others => (others => (others => '0'))));
     end generate;
 
     -- =============================================================================================
@@ -547,47 +550,49 @@ begin
 
         -- Convert address of a DWORD to an address of each individual byte
         -- This is used for address multiplexing
-        addr_multi_regions_g : for i in 0 to MFB_REGIONS - 1 generate
+        addr_multi_regions_g : for rgn in 0 to MFB_REGIONS - 1 generate
             -- Iterate over bytes of a region
-            addr_multi_bytes_g : for j in 0 to ((MFB_LENGTH/8) -1) generate
-                wr_addr_bram_by_multi(i)(j) <= wr_addr_bram_by_shift_reg(REG_NUM)(i)(j/4);
+            addr_multi_bytes_g : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
+                wr_addr_bram_by_multi(rgn)(wbyte) <= wr_addr_bram_by_shift_reg(REG_NUM)(rgn)(wbyte/4);
             end generate;
         end generate;
 
         -- Address Select 
         -- First port controlled by Byte Enable
-        -- Second port is controlled by second region SOF
+        -- Second port is controlled by the second region's SOF
         -- The first bit in Byte Enable is enough to decide whether read to write
-        addr_sel(0) <= pcie_mfb_meta_arr(0)(META_BE_O);
-        addr_sel(1) <= pcie_mfb_sof_inp_reg(REG_NUM)(1);
-        
-        -- The Address Multiplexer - Choose between PCIe and Read Port
-        addr_mux_p : for i in 0 to MFB_REGIONS - 1 generate
-            addr_mux_p: process(all)
-            begin
-                -- Default assignment
-                rw_addr_bram_by_mux(i)  <= (others => (others => '0'));
-                
-                if (pcie_mfb_src_rdy_inp_reg(REG_NUM) = '1') then
-                    if (addr_sel(i) = '1') then
-                        rw_addr_bram_by_mux(i) <= wr_addr_bram_by_multi(i);
-                    else
-                        rw_addr_bram_by_mux(i) <= rd_addr_bram_by_shift;
-                    end if;
-                end if;
-            end process;
+        addr_sel_g: for ch in 0 to (CHANNELS -1) generate
+            addr_sel(ch)(0) <= wr_be_bram_demux_reg(REG_NUM)(ch)(0)(0);
+            addr_sel(ch)(1) <= wr_be_bram_demux_reg(REG_NUM)(ch)(1)(0);
         end generate;
 
-        -- Read enable - Write port priority
-        rd_en_ch_g : for j in 0 to (CHANNELS -1) generate
-            rd_en_reg_g : for i in 0 to (MFB_REGIONS - 1) generate
-                -- Read enable per channel
-                rd_en_pch(i)(j) <= rd_en_bram_demux(j) and (not addr_sel(i));
+        -- The Address Multiplexer - Choose between Write and Read Port
+        addr_mux_chans_g : for ch in 0 to (CHANNELS -1) generate
+            addr_mux_regions_g : for rgn in 0 to (MFB_REGIONS -1) generate
+                addr_mux_p: process(all)
+                begin
+                    -- Default assignment
+                    rw_addr_bram_by_mux(ch)(rgn)  <= (others => (others => '0'));
+
+                    if (addr_sel(ch)(rgn) = '1') then
+                        rw_addr_bram_by_mux(ch)(rgn) <= wr_addr_bram_by_multi(rgn);
+                    else
+                        rw_addr_bram_by_mux(ch)(rgn) <= rd_addr_bram_by_shift;
+                    end if;
+                end process;
             end generate;
         end generate;
 
-        brams_for_channels_g : for j in 0 to (CHANNELS -1) generate
-            tdp_bram_be_g : for i in 0 to ((MFB_LENGTH/8) -1) generate
+        -- Read enable - Write port priority
+        rd_en_ch_g : for ch in 0 to (CHANNELS -1) generate
+            rd_en_reg_g : for rgn in 0 to (MFB_REGIONS -1) generate
+                -- Read enable per channel
+                rd_en_pch(ch)(rgn) <= rd_en_bram_demux(ch) and (not addr_sel(ch)(rgn));
+            end generate;
+        end generate;
+
+        brams_for_channels_g : for ch in 0 to (CHANNELS -1) generate
+            tdp_bram_be_g : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
 
                 tdp_bram_be_i : entity work.DP_BRAM_BEHAV
                     generic map (
@@ -605,22 +610,22 @@ begin
                         -- Port A
                         -- =======================================================================
                         PIPE_ENA => '1',
-                        REA      => rd_en_pch(0)(j),
-                        WEA      => wr_be_bram_demux_reg(REG_NUM)(0)(j)(i),
-                        ADDRA    => rw_addr_bram_by_mux(0)(i),
-                        DIA      => wr_data_bram_shifter_reg(REG_NUM)(0)(i*8 +7 downto i*8),
-                        DOA      => rd_data_bram(0)(j)(i*8 +7 downto i*8),
+                        REA      => rd_en_pch(ch)(0),
+                        WEA      => wr_be_bram_demux_reg(REG_NUM)(ch)(0)(wbyte),
+                        ADDRA    => rw_addr_bram_by_mux(ch)(0)(wbyte),
+                        DIA      => wr_data_bram_shifter_reg(REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
+                        DOA      => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8),
                         DOA_DV   => open,
 
                         -- =======================================================================
                         -- Port B
                         -- =======================================================================
                         PIPE_ENB => '1',
-                        REB      => rd_en_pch(1)(j),
-                        WEB      => wr_be_bram_demux_reg(REG_NUM)(1)(j)(i),
-                        ADDRB    => rw_addr_bram_by_mux(1)(i),
-                        DIB      => wr_data_bram_shifter_reg(REG_NUM)(1)(i*8 +7 downto i*8),
-                        DOB      => rd_data_bram(1)(j)(i*8 +7 downto i*8),
+                        REB      => rd_en_pch(ch)(1),
+                        WEB      => wr_be_bram_demux_reg(REG_NUM)(ch)(1)(wbyte),
+                        ADDRB    => rw_addr_bram_by_mux(ch)(1)(wbyte),
+                        DIB      => wr_data_bram_shifter_reg(REG_NUM)(1)(wbyte*8 +7 downto wbyte*8),
+                        DOB      => rd_data_bram(1)(ch)(wbyte*8 +7 downto wbyte*8),
                         DOB_DV   => open
                     );
             end generate;
@@ -629,11 +634,13 @@ begin
         rd_vld_p: process(CLK)
         begin
             if rising_edge(CLK) then
+
                 rd_data_valid_arr   <= (others => '0');
-                for j in 0 to MFB_REGIONS - 1 loop
-                    for i in 0 to CHANNELS - 1 loop
-                        if rd_en_pch(j)(i) = '1' then 
-                            rd_data_valid_arr(j) <= '1';
+
+                for ch in 0 to (CHANNELS -1) loop
+                    for rgn in 0 to (MFB_REGIONS - 1) loop
+                        if rd_en_pch(ch)(rgn) = '1' then
+                            rd_data_valid_arr(rgn) <= '1';
                         end if;
                     end loop;
                 end loop;
