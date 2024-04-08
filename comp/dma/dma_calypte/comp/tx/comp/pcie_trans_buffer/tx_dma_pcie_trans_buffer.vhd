@@ -122,7 +122,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     signal rd_en_bram_demux         : std_logic_vector(CHANNELS -1 downto 0);
     signal rd_data_bram_mux         : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal rd_data_bram             : slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)(MFB_LENGTH -1 downto 0);
+    signal rd_data_bram             : slv_array_2d_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
     signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
 
     -- ================= --
@@ -534,7 +534,7 @@ begin
                             RD_PIPE_EN  => rd_en_bram_demux(ch),
                             RD_META_IN  => (others => '0'),
                             RD_ADDR     => rd_addr_bram_by_shift(wbyte),
-                            RD_DATA     => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8),
+                            RD_DATA     => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8),
                             RD_META_OUT => open,
                             RD_DATA_VLD => open);
 
@@ -554,7 +554,7 @@ begin
                             WR_ADDR => wr_addr_bram_by_shift_reg(BRAM_REG_NUM)(0)(wbyte/4),
                             WR_DATA => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
                             RD_ADDR => rd_addr_bram_by_shift(wbyte),
-                            RD_DATA => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8));
+                            RD_DATA => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8));
                 end generate;
             end generate;
         end generate;
@@ -634,7 +634,7 @@ begin
                         WEA      => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0)(wbyte),
                         ADDRA    => rw_addr_bram_by_mux(ch)(0)(wbyte),
                         DIA      => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
-                        DOA      => rd_data_bram(0)(ch)(wbyte*8 +7 downto wbyte*8),
+                        DOA      => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8),
                         DOA_DV   => open,
 
                         -- =======================================================================
@@ -645,7 +645,7 @@ begin
                         WEB      => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(1)(wbyte),
                         ADDRB    => rw_addr_bram_by_mux(ch)(1)(wbyte),
                         DIB      => wr_data_bram_shifter_reg(BRAM_REG_NUM)(1)(wbyte*8 +7 downto wbyte*8),
-                        DOB      => rd_data_bram(1)(ch)(wbyte*8 +7 downto wbyte*8),
+                        DOB      => rd_data_bram(ch)(1)(wbyte*8 +7 downto wbyte*8),
                         DOB_DV   => open
                     );
             end generate;
@@ -684,7 +684,7 @@ begin
     rd_data_demux_g: if (MFB_REGIONS = 1) generate
 
         RD_DATA_VLD      <= '1';
-        rd_data_bram_mux <= rd_data_bram(0)(to_integer(unsigned(RD_CHAN)));
+        rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)))(0);
     else generate
 
         rd_data_demux_p: process(all)
@@ -693,7 +693,7 @@ begin
             RD_DATA_VLD         <= '0';
             for i in 0 to MFB_REGIONS - 1  loop
                 if rd_data_valid_arr(i) = '1' then 
-                    rd_data_bram_mux <= rd_data_bram(i)(to_integer(unsigned(RD_CHAN)));
+                    rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)))(i);
                     RD_DATA_VLD      <= '1';
                 end if;
             end loop;
