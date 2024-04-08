@@ -99,13 +99,11 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     subtype META_CHAN_NUM   is natural range     META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
     subtype META_BE         is natural range                 META_BE_O + META_BE_W -1 downto META_BE_O;
 
-    signal pcie_mfb_data_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_DATA'range);
-    signal pcie_mfb_meta_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_META'range);
-    signal pcie_mfb_sof_reg     : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_SOF'range);
-    signal pcie_mfb_eof_reg     : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_EOF'range);
-    signal pcie_mfb_sof_pos_reg : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_SOF_POS'range);
-    signal pcie_mfb_eof_pos_reg : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_EOF_POS'range);
-    signal pcie_mfb_src_rdy_reg : std_logic_vector(INP_REG_NUM downto 0);
+    -- Input register
+    signal pcie_mfb_data_inp_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_DATA'range);
+    signal pcie_mfb_meta_inp_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_META'range);
+    signal pcie_mfb_sof_inp_reg     : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_SOF'range);
+    signal pcie_mfb_src_rdy_inp_reg : std_logic_vector(INP_REG_NUM downto 0);
 
     -- counter of the address for each valid word following the beginning of the transaction
     signal addr_cntr_pst            : unsigned(META_PCIE_ADDR_W -1 downto 0);
@@ -149,16 +147,10 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     -- Meta signal for whole MFB word
     signal pcie_meta_be_per_port  : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH/8 - 1 downto 0);
 
-    -- Input BRAM registers - what about the address?
+    -- BRAM registers
     signal wr_be_bram_demux_reg      : slv_array_3d_t(BRAM_REG_NUM downto 0)(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_addr_bram_by_shift_reg : slv_array_3d_t(BRAM_REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     signal wr_data_bram_shifter_reg  : slv_array_2d_t(BRAM_REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
-
-    -- Input register
-    signal pcie_mfb_data_inp_reg    : slv_array_t(BRAM_REG_NUM downto 0)(PCIE_MFB_DATA'range);
-    signal pcie_mfb_meta_inp_reg    : slv_array_t(BRAM_REG_NUM downto 0)(PCIE_MFB_META'range);
-    signal pcie_mfb_sof_inp_reg     : slv_array_t(BRAM_REG_NUM downto 0)(PCIE_MFB_SOF'range);
-    signal pcie_mfb_src_rdy_inp_reg : std_logic_vector(BRAM_REG_NUM downto 0);
 
     signal addr_sel                 : slv_array_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0);
 
