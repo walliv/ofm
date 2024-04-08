@@ -16,6 +16,7 @@ package uvm_dma_ll;
     `include "sequencer.sv"
     `include "model.sv"
     `include "scoreboard.sv"
+    `include "coverage.sv"
     `include "env.sv"
 
 endpackage

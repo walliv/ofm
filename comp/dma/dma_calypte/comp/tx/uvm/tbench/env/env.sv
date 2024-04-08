@@ -27,12 +27,16 @@ class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE
 
     //uvm_dma_ll_info::watchdog #(CHANNELS) m_watch_dog;
 
+    coverage #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_cover;
+
     scoreboard #(CHANNELS, USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH,
                  DATA_PTR_WIDTH) sc;
 
     // Constructor of environment.
     function new(string name, uvm_component parent);
         super.new(name, parent);
+
+        m_cover = new("m_cover");
     endfunction
 
     // Create base components of environment.
@@ -98,6 +102,8 @@ class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE
         m_env_rx.regmodel_set(m_regmodel.m_regmodel);
         //m_env_rx.m_watch_dog = m_watch_dog;
         m_reset.sync_connect(m_env_rx.reset_sync);
+
+        m_env_rx.m_env_rx.m_mfb_agent.analysis_port.connect(m_cover.analysis_export);
 
         m_dma.analysis_port.connect(sc.analysis_export_dma);
         m_env_tx.analysis_port_data.connect(sc.analysis_export_tx_packet);
