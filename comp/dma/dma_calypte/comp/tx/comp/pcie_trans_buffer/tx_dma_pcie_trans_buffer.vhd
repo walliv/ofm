@@ -113,7 +113,7 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal wr_shift_sel             : slv_array_t(MFB_REGIONS - 1 downto 0)(log2(MFB_LENGTH/32) -1 downto 0);
 
     signal wr_be_bram_bshifter      : slv_array_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_be_bram_demux         : slv_array_2d_t(MFB_REGIONS - 1 downto 0)(CHANNELS -1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_be_bram_demux         : slv_array_2d_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
     signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
     signal wr_data_bram_bshifter    : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
@@ -465,10 +465,9 @@ begin
 
             if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(i) = '1') then
-                    wr_be_bram_demux(i)(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM)))) <= wr_be_bram_bshifter(i);
+                    wr_be_bram_demux(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i) <= wr_be_bram_bshifter(i);
                 else
-                    -- Zeroes when SOF(1) = '0';
-                    wr_be_bram_demux(i)(to_integer(unsigned(chan_num_pst))) <= wr_be_bram_bshifter(i);
+                    wr_be_bram_demux(to_integer(unsigned(chan_num_pst)))(i)                        <= wr_be_bram_bshifter(i);
                 end if;
             end if;
         end loop;
@@ -477,11 +476,7 @@ begin
     -- =============================================================================================
     -- Registers between BARREL_SHIFTERs and BRAMs
     -- =============================================================================================
-    be_to_regs_by_chan_g: for ch in 0 to (CHANNELS -1) generate
-        be_to_regs_by_rgn_g: for rgn in 0 to (MFB_REGIONS -1) generate
-            wr_be_bram_demux_reg(0)(ch)(rgn) <= wr_be_bram_demux(rgn)(ch);
-        end generate;
-    end generate;
+    wr_be_bram_demux_reg(0)      <= wr_be_bram_demux;
     wr_addr_bram_by_shift_reg(0) <= wr_addr_bram_by_shift;
     wr_data_bram_shifter_reg (0) <= wr_data_bram_bshifter;
 
