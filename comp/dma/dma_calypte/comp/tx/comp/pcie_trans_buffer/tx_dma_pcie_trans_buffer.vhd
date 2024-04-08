@@ -480,19 +480,17 @@ begin
     wr_addr_bram_by_shift_reg(0) <= wr_addr_bram_by_shift;
     wr_data_bram_shifter_reg (0) <= wr_data_bram_bshifter;
 
-    bram_input_reg_g : for i in 0 to BRAM_REG_NUM - 1 generate
-        bram_input_reg_p : process(CLK) is
-        begin
-            if rising_edge(CLK) then
-                -- if RESET = '1' then
-                    -- wr_be_bram_demux_reg(i + 1) <= (others => (others => (others => '0')));
-                -- else
-                wr_be_bram_demux_reg     (i + 1) <= wr_be_bram_demux_reg     (i);
-                wr_addr_bram_by_shift_reg(i + 1) <= wr_addr_bram_by_shift_reg(i);
-                wr_data_bram_shifter_reg (i + 1) <= wr_data_bram_shifter_reg (i);
-                -- end if;
-            end if;
-        end process;
+    bram_input_reg_mult_g: if (BRAM_REG_NUM > 0) generate
+        bram_input_reg_g : for i in 0 to BRAM_REG_NUM - 1 generate
+            bram_input_reg_p : process(CLK) is
+            begin
+                if rising_edge(CLK) then
+                    wr_be_bram_demux_reg     (i + 1) <= wr_be_bram_demux_reg     (i);
+                    wr_addr_bram_by_shift_reg(i + 1) <= wr_addr_bram_by_shift_reg(i);
+                    wr_data_bram_shifter_reg (i + 1) <= wr_data_bram_shifter_reg (i);
+                end if;
+            end process;
+        end generate;
     end generate;
 
     -- =============================================================================================
