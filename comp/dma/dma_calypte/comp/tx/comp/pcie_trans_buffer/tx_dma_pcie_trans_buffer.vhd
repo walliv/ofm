@@ -578,9 +578,12 @@ begin
         -- First port controlled by Byte Enable
         -- Second port is controlled by the second region's SOF
         -- The first bit in Byte Enable is enough to decide whether read to write
+        -- OPT: ORing the whole signal can be logically intensive. This could be done.
+        -- in the beginning by oring only 4 first bits because there is a FBE portion which
+        -- always has to have at least 1 bit set to 1.
         addr_sel_g: for ch in 0 to (CHANNELS -1) generate
-            addr_sel(ch)(0) <= wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0)(0);
-            addr_sel(ch)(1) <= wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(1)(0);
+            addr_sel(ch)(0) <= or wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0);
+            addr_sel(ch)(1) <= or wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(1);
         end generate;
 
         -- The Address Multiplexer - Choose between Write and Read Port
