@@ -364,28 +364,33 @@ begin
     -- Port A
     wr_addr_correction_a_p: process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
+        variable buff_addr_v          : std_logic_vector(log2(BUFFER_DEPTH) -1 downto 0);
     begin
         wr_addr_bram_by_shift(0) <= (others => (others => '0'));
 
         if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
             if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(0) = '1') then
                 -- Pass address to variable
-                pcie_mfb_meta_addr_v := std_logic_vector(unsigned(pcie_mfb_meta_arr(0)(META_PCIE_ADDR)));
-                wr_addr_bram_by_shift(0) <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS)));
+                pcie_mfb_meta_addr_v := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
+                buff_addr_v          := pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS));
 
-                -- Increment address in bytes that has been overflowed
+                wr_addr_bram_by_shift(0) <= (others => buff_addr_v);
+
+                -- Increment address in bytes that have been rotated
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
                     if (i < unsigned(pcie_mfb_meta_addr_v(log2(MFB_DWORDS) - 1 downto 0))) then
-                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS))) + 1);
+                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
                     end if;
                 end loop;
             else
-                wr_addr_bram_by_shift(0) <= (others => std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS))));
+                buff_addr_v := std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS)));
 
-                -- Increment address in bytes that has been overflowed
+                wr_addr_bram_by_shift(0) <= (others => buff_addr_v);
+
+                -- Increment address in bytes that have been rotated
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
                     if (i < addr_cntr_pst(log2(MFB_DWORDS) - 1 downto 0)) then
-                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS))) + 1);
+                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
                     end if;
                 end loop;
             end if;
@@ -396,19 +401,22 @@ begin
     wr_addr_correction_b_g: if (MFB_REGIONS = 2) generate
         wr_addr_correction_b_p: process (all) is
             variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
+            variable buff_addr_v          : std_logic_vector(log2(BUFFER_DEPTH) -1 downto 0);
         begin
             wr_addr_bram_by_shift(1) <= (others => (others => '0'));
 
             if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(1) = '1') then
                     -- Pass address to variable
-                    pcie_mfb_meta_addr_v := std_logic_vector(unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) + MFB_BLOCK_SIZE);
-                    wr_addr_bram_by_shift(1) <= (others => pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS)));
+                    pcie_mfb_meta_addr_v := pcie_mfb_meta_arr(1)(META_PCIE_ADDR);
+                    buff_addr_v          := pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS));
+
+                    wr_addr_bram_by_shift(1) <= (others => buff_addr_v);
 
                     -- Increment address in bytes that has been overflowed
                     for i in 0 to ((MFB_LENGTH/32) -1) loop
                         if (i < unsigned(pcie_mfb_meta_addr_v(log2(MFB_DWORDS) - 1 downto 0))) then
-                            wr_addr_bram_by_shift(1)(i) <= std_logic_vector(unsigned(pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS))) + 1);
+                            wr_addr_bram_by_shift(1)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
                         end if;
                     end loop;
                 -- else is not the case - the first port will handle it 
