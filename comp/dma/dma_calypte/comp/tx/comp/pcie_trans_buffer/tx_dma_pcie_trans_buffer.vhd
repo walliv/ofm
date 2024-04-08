@@ -558,13 +558,6 @@ begin
                 end generate;
             end generate;
         end generate;
-    else generate
-            
-        rd_data_valid_arr       <= (others => '0');
-        addr_sel                <= (others => (others => '0'));
-        rd_en_pch               <= (others => (others => '0'));
-        wr_addr_bram_by_multi   <= (others => (others => (others => '0')));
-        rw_addr_bram_by_mux     <= (others => (others => (others => (others => '0'))));
     end generate;
 
     -- =============================================================================================
