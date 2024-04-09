@@ -357,7 +357,7 @@ begin
     -- Possibilites:
     --     SOF(0) SOF(1)   PORTS 
     -- 1)    0      0       A A
-    -- 2)    0      1       A B 
+    -- 2)    0      1       A B  -- Illegal combination in this case
     -- 3)    1      0       A A
     -- 4)    1      1       A B
 
@@ -441,8 +441,8 @@ begin
         end if;
     end process;
 
-    -- this FSM stores the number of a channel in order to properly steer the demultiplexers
-    -- That was true, but now it stores last valid channel
+    -- This FSM stores the number of a channel in order to properly steer the demultiplexers. It
+    -- stores channel number for the last valid SOF in the word.
     chan_num_hold_nst_logic_p: process (all) is
     begin
         chan_num_nst <= chan_num_pst;
@@ -463,7 +463,7 @@ begin
     -- Possibilites:
     --     SOF(0) SOF(1)
     -- 1)    0      0   - Port A handles whole MFB word = Last valid channel is used 
-    -- 2)    0      1   - Port A handles first region, Second region is dispatched by port B
+    -- 2)    0      1   - Port A handles first region, Second region is dispatched by port B (illegal for incoming data)
     -- 3)    1      0   - Port A handles whole MFB word = Current channel is used 
     -- 4)    1      1   - Port A handles first region, Second region is dispatched by port B
     wr_bram_data_demux_p: process (all) is
