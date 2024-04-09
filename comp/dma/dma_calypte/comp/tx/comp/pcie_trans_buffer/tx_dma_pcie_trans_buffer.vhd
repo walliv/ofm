@@ -468,9 +468,9 @@ begin
     -- 4)    1      1   - Port A handles first region, Second region is dispatched by port B
     wr_bram_data_demux_p: process (all) is
     begin
-        for i in 0 to (MFB_REGIONS - 1) loop
-            wr_be_bram_demux(i) <= (others => (others => '0'));
+        wr_be_bram_demux <= (others => (others => (others => '0')));
 
+        for i in 0 to (MFB_REGIONS - 1) loop
             if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(i) = '1') then
                     wr_be_bram_demux(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i) <= wr_be_bram_bshifter(i);
