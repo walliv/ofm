@@ -313,7 +313,8 @@ begin
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(1) = '1') then
                     -- The '+8' is MFB_BLOCK_SIZE (same as length of a REGION in Dwords) and is
                     -- only used when the SOF is in the second region
-                    pcie_mfb_meta_addr_v    := std_logic_vector(unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) + 8);
+                    -- NOTE: that -8 can be a source of error. Was +8 previously.
+                    pcie_mfb_meta_addr_v    := std_logic_vector(unsigned(pcie_mfb_meta_arr(1)(META_PCIE_ADDR)) - 8);
                     wr_shift_sel(1)         <= pcie_mfb_meta_addr_v(log2(MFB_DWORDS) - 1  downto 0);
                 end if;
             end if;
