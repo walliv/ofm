@@ -683,7 +683,13 @@ begin
 
     rd_data_demux_g: if (MFB_REGIONS = 1) generate
 
-        RD_DATA_VLD      <= '1';
+        rd_data_vld_reg_p: process (CLK) is
+        begin
+            if (rising_edge(CLK)) then
+                RD_DATA_VLD <= RD_EN;
+            end if;
+        end process;
+
         rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)))(0);
     else generate
 
