@@ -104,8 +104,8 @@ class reg_channel extends uvm_reg_block;
         this.default_map.add_reg(hw_data_pointer  , 'h18, "RO");
         this.default_map.add_reg(hw_hdr_pointer   , 'h1C, "RO");
 
-        this.default_map.add_reg(data_mask        , 'h58, "RW");
-        this.default_map.add_reg(hdr_mask         , 'h5C, "RW");
+        this.default_map.add_reg(data_mask        , 'h58, "RO");
+        this.default_map.add_reg(hdr_mask         , 'h5C, "RO");
 
         this.default_map.add_reg(sent_packets     , 'h60, "RW");
         this.default_map.add_reg(sent_bytes       , 'h68, "RW");
