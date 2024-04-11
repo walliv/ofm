@@ -221,9 +221,6 @@ architecture FULL of TX_DMA_CALYPTE is
     signal st_sp_ctrl_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
     signal st_sp_ctrl_mfb_meta    : std_logic_vector(PCIE_CQ_MFB_REGIONS*(META_BE_W + META_BE_O) -1 downto 0);
     signal st_sp_ctrl_mfb_sof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
-    signal st_sp_ctrl_mfb_eof     : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
-    signal st_sp_ctrl_mfb_sof_pos : std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE)) -1 downto 0);
-    signal st_sp_ctrl_mfb_eof_pos : std_logic_vector(PCIE_CQ_MFB_REGIONS*max(1, log2(PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE)) -1 downto 0);
     signal st_sp_ctrl_mfb_src_rdy : std_logic;
     signal st_sp_ctrl_mfb_dst_rdy : std_logic;
 
@@ -422,9 +419,9 @@ begin
             USR_MFB_DATA    => st_sp_ctrl_mfb_data,
             USR_MFB_META    => st_sp_ctrl_mfb_meta,
             USR_MFB_SOF     => st_sp_ctrl_mfb_sof,
-            USR_MFB_EOF     => st_sp_ctrl_mfb_eof,
-            USR_MFB_SOF_POS => st_sp_ctrl_mfb_sof_pos,
-            USR_MFB_EOF_POS => st_sp_ctrl_mfb_eof_pos,
+            USR_MFB_EOF     => open,
+            USR_MFB_SOF_POS => open,
+            USR_MFB_EOF_POS => open,
             USR_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy,
             USR_MFB_DST_RDY => st_sp_ctrl_mfb_dst_rdy,
 
@@ -459,11 +456,7 @@ begin
             PCIE_MFB_DATA    => st_sp_ctrl_mfb_data,
             PCIE_MFB_META    => st_sp_ctrl_mfb_meta,
             PCIE_MFB_SOF     => st_sp_ctrl_mfb_sof,
-            PCIE_MFB_EOF     => st_sp_ctrl_mfb_eof,
-            PCIE_MFB_SOF_POS => st_sp_ctrl_mfb_sof_pos,
-            PCIE_MFB_EOF_POS => st_sp_ctrl_mfb_eof_pos,
             PCIE_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_dst_rdy and (not st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0)),
-            PCIE_MFB_DST_RDY => open,
 
             RD_CHAN     => trbuff_rd_chan,
             RD_DATA     => trbuff_rd_data,
