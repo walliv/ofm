@@ -152,9 +152,9 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
         int_mfb_meta_deparse $PATH/st_sp_ctrl_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 3 $META_WO_BYTE_CNT_W
     }
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_sof
-    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_eof
-    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_sof_pos
-    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_eof_pos
+    add_wave "-noupdate -group \"INTERNALS\" -label \"st_sp_ctrl_mfb_eof\" -bin" $PATH/tx_dma_chan_start_stop_ctrl_i/USR_MFB_EOF
+    add_wave "-noupdate -group \"INTERNALS\" -label \"st_sp_ctrl_mfb_sof_pos\" -bin" $PATH/tx_dma_chan_start_stop_ctrl_i/USR_MFB_SOF_POS
+    add_wave "-noupdate -group \"INTERNALS\" -label \"st_sp_ctrl_mfb_eof_pos\" -bin" $PATH/tx_dma_chan_start_stop_ctrl_i/USR_MFB_EOF_POS
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_src_rdy
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_dst_rdy
 
@@ -426,8 +426,8 @@ proc pkt_dispatcher {PATH} {
     add_wave "-noupdate -group \"$grp_name\" -unsigned" $PATH/BUFF_RD_CHAN
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_DATA
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_ADDR
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_DATA_VLD
     add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_EN
+    add_wave "-noupdate -group \"$grp_name\"" $PATH/BUFF_RD_DATA_VLD
 
     add wave -noupdate -group "$grp_name" -divider "HDR_BUFFER"
 
@@ -478,14 +478,8 @@ proc pkt_dispatcher {PATH} {
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/disp_fsm_mfb_eof_pos
     add_wave "-noupdate -group \"$grp_name\"" $PATH/disp_fsm_mfb_src_rdy
 
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/mfb_dst_rdy_reg
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/buff_rd_data_reg
-    
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/req_fsm_pst
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/req_fsm_nst
-
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_pst
-    add_wave "-noupdate -group \"$grp_name\"" $PATH/byte_cntr_nst
+    add_wave "-noupdate -group \"$grp_name\" -unsigned" $PATH/byte_cntr_pst
+    add_wave "-noupdate -group \"$grp_name\" -unsigned" $PATH/byte_cntr_nst
 
     add_wave "-noupdate -group \"$grp_name\"" $PATH/fr_len_round_up_msk
     add_wave "-noupdate -group \"$grp_name\"" $PATH/fr_len_rounded
