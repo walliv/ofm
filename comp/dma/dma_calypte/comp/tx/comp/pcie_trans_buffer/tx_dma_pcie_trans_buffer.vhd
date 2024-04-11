@@ -46,11 +46,7 @@ entity TX_DMA_PCIE_TRANS_BUFFER is
         PCIE_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
         PCIE_MFB_META    : in  std_logic_vector(MFB_REGIONS*((MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)-1 downto 0);
         PCIE_MFB_SOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
-        PCIE_MFB_EOF     : in  std_logic_vector(MFB_REGIONS -1 downto 0);
-        PCIE_MFB_SOF_POS : in  std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE)) -1 downto 0);
-        PCIE_MFB_EOF_POS : in  std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE*MFB_BLOCK_SIZE)) -1 downto 0);
         PCIE_MFB_SRC_RDY : in  std_logic;
-        PCIE_MFB_DST_RDY : out std_logic := '1';
 
         -- =========================================================================================
         -- Output reading interface
