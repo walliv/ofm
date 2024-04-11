@@ -64,9 +64,9 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
     local dma_info dma_hdr;
 
     typedef struct{
-        int unsigned dma_cnt            = 0;
+        int unsigned pkt_cnt            = 0;
         int unsigned byte_cnt           = 0;
-        int unsigned discard_dma_cnt    = 0;
+        int unsigned discard_pkt_cnt    = 0;
         int unsigned discard_byte_cnt   = 0;
         logic        read_valid         = 1'b1;
         int unsigned read_delay_discard = 0;
@@ -115,9 +115,9 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
 
         logic [USR_ITEM_WIDTH-1 : 0] dma_memory[CHANNELS][logic [DATA_ADDR_W-1 : 0]];
 
-        uvm_reg_data_t   dma_cnt         ;
+        uvm_reg_data_t   pkt_cnt         ;
         uvm_reg_data_t   byte_cnt        ;
-        uvm_reg_data_t   discard_dma_cnt ;
+        uvm_reg_data_t   discard_pkt_cnt ;
         uvm_reg_data_t   discard_byte_cnt;
         uvm_status_e     status_r        ;
         string           debug_msg       ;
@@ -274,12 +274,12 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
 
                     // Check if data are valid (channel is running and there is no drop)
                     if (m_model_info.run[1] == 0 || (m_model_info.run[1] == 1 && discard_comp.drop == 0)) begin
-                        cnt_reg[int'(m_pcie_info.channel)].dma_cnt++;
+                        cnt_reg[int'(m_pcie_info.channel)].pkt_cnt++;
                         cnt_reg[int'(m_pcie_info.channel)].byte_cnt += dma_hdr.dma_size;
 
                         debug_msg = "\n";
                         $swrite(debug_msg, "%s================================================================================= \n", debug_msg);
-                        $swrite(debug_msg, "%sMODEL OUTPUT DMA TRANSACTION %0d\n", debug_msg, cnt_reg[int'(m_pcie_info.channel)].dma_cnt);
+                        $swrite(debug_msg, "%sMODEL OUTPUT DMA TRANSACTION %0d\n", debug_msg, cnt_reg[int'(m_pcie_info.channel)].pkt_cnt);
                         $swrite(debug_msg, "%s================================================================================= \n", debug_msg);
                         $swrite(debug_msg, "%sCHANNEL              : %0d\n", debug_msg, int'(m_pcie_info.channel));
                         $swrite(debug_msg, "%sFRAME POINTER        : %0d\n", debug_msg, dma_hdr.frame_pointer);
@@ -305,21 +305,21 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
                 if (m_pcie_info.hdr_identifier == 1'b1) begin
                     dma_hdr.dma_size = in_data_tr.data[4][15 : 0];
 
-                    cnt_reg[int'(m_pcie_info.channel)].discard_dma_cnt++;
+                    cnt_reg[int'(m_pcie_info.channel)].discard_pkt_cnt++;
                     cnt_reg[int'(m_pcie_info.channel)].discard_byte_cnt += dma_hdr.dma_size;
 
                     if (m_model_info.status[int'(m_pcie_info.channel)] == 1'b0 && cnt_reg[int'(m_pcie_info.channel)].read_valid == 1'b1) begin
                         m_regmodel.channel[int'(m_pcie_info.channel)].sent_packets.write(status_r, {32'h1, 32'h1});
-                        m_regmodel.channel[int'(m_pcie_info.channel)].sent_packets.read(status_r, dma_cnt);
+                        m_regmodel.channel[int'(m_pcie_info.channel)].sent_packets.read(status_r, pkt_cnt);
                         m_regmodel.channel[int'(m_pcie_info.channel)].sent_bytes.write(status_r, {32'h1, 32'h1});
                         m_regmodel.channel[int'(m_pcie_info.channel)].sent_bytes.read(status_r, byte_cnt);
 
                         if (int'(byte_cnt) != cnt_reg[int'(m_pcie_info.channel)].byte_cnt &&
-                            int'(dma_cnt)  != cnt_reg[int'(m_pcie_info.channel)].dma_cnt) begin
+                            int'(pkt_cnt)  != cnt_reg[int'(m_pcie_info.channel)].pkt_cnt) begin
                             debug_msg = "";
                             $swrite(debug_msg, "%s\nWRONG VALID COUNTERS ON CHANNEL %d\n",        debug_msg, int'(m_pcie_info.channel));
                             $swrite(debug_msg, "%s\nDUT BYTE COUNT %d and MODEL BYTE COUNT %d\n", debug_msg, byte_cnt, cnt_reg[int'(m_pcie_info.channel)].byte_cnt);
-                            $swrite(debug_msg, "%sDUT DMA COUNT %d and MODEL DMA COUNT %d\n",     debug_msg, dma_cnt, cnt_reg[int'(m_pcie_info.channel)].dma_cnt);
+                            $swrite(debug_msg, "%sDUT DMA COUNT %d and MODEL DMA COUNT %d\n",     debug_msg, pkt_cnt, cnt_reg[int'(m_pcie_info.channel)].pkt_cnt);
                             `uvm_error(this.get_full_name(),                                      debug_msg);
                         end
 
@@ -327,8 +327,8 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
                         $swrite(debug_msg, "%s\nRECEIVED STATISTICS\n", debug_msg);
                         $swrite(debug_msg, "%sTIME %t\n",               debug_msg, $time());
                         $swrite(debug_msg, "%sCHANNEL %d\n",            debug_msg, int'(m_pcie_info.channel));
-                        $swrite(debug_msg, "%sDMA CNT %d\n",            debug_msg, cnt_reg[int'(m_pcie_info.channel)].dma_cnt);
-                        $swrite(debug_msg, "%sDMA CNT REG %d\n",        debug_msg, dma_cnt);
+                        $swrite(debug_msg, "%sDMA CNT %d\n",            debug_msg, cnt_reg[int'(m_pcie_info.channel)].pkt_cnt);
+                        $swrite(debug_msg, "%sDMA CNT REG %d\n",        debug_msg, pkt_cnt);
                         $swrite(debug_msg, "%sBYTE CNT %d\n",           debug_msg, cnt_reg[int'(m_pcie_info.channel)].byte_cnt);
                         $swrite(debug_msg, "%sBYTE CNT REG %d\n",       debug_msg, byte_cnt);
                         `uvm_info(this.get_full_name(),                 debug_msg, UVM_MEDIUM)
@@ -343,16 +343,16 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
 
                 if (cnt_reg[int'(m_pcie_info.channel)].read_delay_discard == 30) begin
                     m_regmodel.channel[int'(m_pcie_info.channel)].discarded_packets.write(status_r, {32'h1, 32'h1});
-                    m_regmodel.channel[int'(m_pcie_info.channel)].discarded_packets.read(status_r, discard_dma_cnt);
+                    m_regmodel.channel[int'(m_pcie_info.channel)].discarded_packets.read(status_r, discard_pkt_cnt);
                     m_regmodel.channel[int'(m_pcie_info.channel)].discarded_bytes.write(status_r, {32'h1, 32'h1});
                     m_regmodel.channel[int'(m_pcie_info.channel)].discarded_bytes.read(status_r, discard_byte_cnt);
 
                     if (int'(discard_byte_cnt) != cnt_reg[int'(m_pcie_info.channel)].discard_byte_cnt &&
-                        int'(discard_dma_cnt)  != cnt_reg[int'(m_pcie_info.channel)].discard_dma_cnt) begin
+                        int'(discard_pkt_cnt)  != cnt_reg[int'(m_pcie_info.channel)].discard_pkt_cnt) begin
                         debug_msg = "";
                         $swrite(debug_msg, "%s\nWRONG DISCARD COUNTERS ON CHANNEL %d\n", debug_msg, int'(m_pcie_info.channel));
                         $swrite(debug_msg, "%s\nDUT DISCARD BYTE COUNT %d and MODEL DISCARD BYTE COUNT %d\n", debug_msg, discard_byte_cnt, cnt_reg[int'(m_pcie_info.channel)].discard_byte_cnt);
-                        $swrite(debug_msg, "%sDUT DISCARD DMA COUNT %d and MODEL DISCARD DMA COUNT %d\n", debug_msg, discard_dma_cnt, cnt_reg[int'(m_pcie_info.channel)].discard_dma_cnt);
+                        $swrite(debug_msg, "%sDUT DISCARD DMA COUNT %d and MODEL DISCARD DMA COUNT %d\n", debug_msg, discard_pkt_cnt, cnt_reg[int'(m_pcie_info.channel)].discard_pkt_cnt);
                         `uvm_error(this.get_full_name(), debug_msg);
                     end
 
@@ -360,8 +360,8 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
                     $swrite(debug_msg, "%s\nDISCARD STATISTICS\n", debug_msg);
                     $swrite(debug_msg, "%sTIME %t\n",              debug_msg, $time());
                     $swrite(debug_msg, "%sCHANNEL %d\n",           debug_msg, int'(m_pcie_info.channel));
-                    $swrite(debug_msg, "%sDMA CNT %d\n",           debug_msg, cnt_reg[int'(m_pcie_info.channel)].discard_dma_cnt);
-                    $swrite(debug_msg, "%sDMA CNT REG %d\n",       debug_msg, discard_dma_cnt);
+                    $swrite(debug_msg, "%sDMA CNT %d\n",           debug_msg, cnt_reg[int'(m_pcie_info.channel)].discard_pkt_cnt);
+                    $swrite(debug_msg, "%sDMA CNT REG %d\n",       debug_msg, discard_pkt_cnt);
                     $swrite(debug_msg, "%sBYTE CNT %d\n",          debug_msg, cnt_reg[int'(m_pcie_info.channel)].discard_byte_cnt);
                     $swrite(debug_msg, "%sBYTE CNT REG %d\n",      debug_msg, discard_byte_cnt);
                     `uvm_info(this.get_full_name(),                debug_msg, UVM_MEDIUM)
