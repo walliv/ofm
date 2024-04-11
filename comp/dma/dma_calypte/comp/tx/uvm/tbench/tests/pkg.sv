@@ -42,12 +42,8 @@ package test;
     parameter PKT_SIZE_MAX       = 2**11;
     // Parameters that set min and max size of PCIE transaction
     parameter PCIE_LEN_MAX = 256;
-    // Simulation parameters
-    // TODO: Pokus se to smazat!!!
-    parameter TRANSACTION_COUNT = 100000;
 
     parameter CLK_PERIOD = 4ns;
-
 
     `include "sequence.sv"
     `include "base.sv"
