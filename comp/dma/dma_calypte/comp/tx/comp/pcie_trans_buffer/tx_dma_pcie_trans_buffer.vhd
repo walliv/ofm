@@ -181,6 +181,23 @@ begin
     pcie_mfb_meta_arr   <= slv_array_deser(pcie_mfb_meta_inp_reg(INP_REG_NUM), MFB_REGIONS);
 
     -- =============================================================================================
+    -- Assertions for verification
+    -- =============================================================================================
+    assert_dma_hdr_check_p: process (all) is
+        constant NULL_VECT : std_logic_vector(META_BE_W -1 downto 0) := (others => '0');
+    begin
+        if rising_edge(CLK) then
+            for i in 0 to (MFB_REGIONS -1) loop
+                if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1' and pcie_mfb_meta_arr(i)(META_BE) /= NULL_VECT) then
+                    assert (pcie_mfb_meta_arr(i)(META_IS_DMA_HDR) = "0")
+                        report "TX_DMA_PCIE_TRANS_BUFFER: captured DMA header on region " & to_string(i) & "! Danger of data overwrite!"
+                        severity FAILURE;
+                end if;
+            end loop;
+        end if;
+    end process;
+
+    -- =============================================================================================
     -- Address storage
     -- =============================================================================================
     addr_cntr_reg_p: process (CLK) is
