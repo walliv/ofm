@@ -264,6 +264,17 @@ architecture FULL of TX_DMA_CALYPTE is
     signal hdr_fifo_status : std_logic_vector(log2((2**DMA_HDR_POINTER_WIDTH) * CHANNELS) downto 0);
     -- attribute mark_debug of hdr_fifo_status : signal is "true";
 
+    -- parsed specific bits from st_sp_ctrl_mfb_meta_arr that indicate the validity of the DMA
+    -- header in a current word
+    signal st_sp_ctrl_mfb_sof_masked       : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
+    signal st_sp_ctrl_mfb_meta_w_be_masked : std_logic_vector(st_sp_ctrl_mfb_meta'range);
+    signal st_sp_ctrl_mfb_meta_is_dma_hdr  : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
+    signal st_sp_ctrl_mfb_meta_be          : slv_array_t(PCIE_CQ_MFB_REGIONS -1 downto 0)(META_BE_W-1 downto 0);
+    signal mfb_meta_be_masked              : slv_array_t(PCIE_CQ_MFB_REGIONS -1 downto 0)(META_BE_W-1 downto 0);
+    signal mfb_meta_new                    : slv_array_t(PCIE_CQ_MFB_REGIONS -1 downto 0)(META_BE_W+META_BE_O-1 downto 0);
+    signal mfb_meta_vld_regions            : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
+    signal mfb_data_is_only_dma_hdr        : std_logic;
+
     -- fifox_multi support
     signal st_sp_ctrl_mfb_meta_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)((META_BE_W + META_BE_O) -1 downto 0);
     signal st_sp_ctrl_mfb_data_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)(PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE*PCIE_CQ_MFB_ITEM_WIDTH - 1 downto 0);
@@ -438,6 +449,30 @@ begin
             ST_SP_DBG_META => ST_SP_DBG_META,
             ST_SP_DBG_CHAN => ST_SP_DBG_CHAN);
 
+    st_sp_ctrl_mfb_meta_arr <= slv_array_deser(st_sp_ctrl_mfb_meta, PCIE_CQ_MFB_REGIONS);
+
+    meta_is_dma_hdr_g : for i in 0 to (PCIE_CQ_MFB_REGIONS -1) generate
+        -- Extract metadata to separate signals
+        st_sp_ctrl_mfb_meta_is_dma_hdr(i downto i) <= st_sp_ctrl_mfb_meta_arr(i)(META_IS_DMA_HDR);
+        st_sp_ctrl_mfb_meta_be(i)                  <= st_sp_ctrl_mfb_meta_arr(i)(META_BE);
+
+        -- Masking SOF to the transaction buffer when there is a DMA header in a specific region
+        st_sp_ctrl_mfb_sof_masked(i)                                   <= '0'             when st_sp_ctrl_mfb_meta_is_dma_hdr(i) = '1' else st_sp_ctrl_mfb_sof(i);
+        -- Mask byte enable when there is a DMA header in a current region
+        mfb_meta_be_masked(i)                                          <= (others => '0') when st_sp_ctrl_mfb_meta_is_dma_hdr(i) = '1' else st_sp_ctrl_mfb_meta_arr(i)(META_BE);
+        -- Return masked byte enable back to the original signal
+        mfb_meta_new(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto 0) <= st_sp_ctrl_mfb_meta_arr(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto 0);
+        mfb_meta_new(i)(META_BE)                                       <= mfb_meta_be_masked(i);
+        -- only lower 4 bits are sufficient to determine the validity of a region
+        mfb_meta_vld_regions(i)                                        <= or (st_sp_ctrl_mfb_meta_be(i)(3 downto 0));
+    end generate;
+
+    -- This signal is set to 1 if the current word contains only DMA headers in at least one of its
+    -- regions and no data in all other regions.
+    mfb_data_is_only_dma_hdr <= (or mfb_meta_vld_regions) and (and (mfb_meta_vld_regions xnor st_sp_ctrl_mfb_meta_is_dma_hdr));
+
+    st_sp_ctrl_mfb_meta_w_be_masked <= slv_array_ser(mfb_meta_new);
+
     tx_dma_pcie_trans_buffer_i : entity work.TX_DMA_PCIE_TRANS_BUFFER
         generic map (
             DEVICE   => DEVICE,
@@ -454,21 +489,18 @@ begin
             RESET => RESET,
 
             PCIE_MFB_DATA    => st_sp_ctrl_mfb_data,
-            PCIE_MFB_META    => st_sp_ctrl_mfb_meta,
-            PCIE_MFB_SOF     => st_sp_ctrl_mfb_sof,
-            PCIE_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_dst_rdy and (not st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0)),
+            PCIE_MFB_META    => st_sp_ctrl_mfb_meta_w_be_masked,
+            PCIE_MFB_SOF     => st_sp_ctrl_mfb_sof_masked,
+            PCIE_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_dst_rdy and (not mfb_data_is_only_dma_hdr),
 
             RD_CHAN     => trbuff_rd_chan,
             RD_DATA     => trbuff_rd_data,
             RD_ADDR     => trbuff_rd_addr,
             RD_EN       => trbuff_rd_en,
-            RD_DATA_VLD => trbuff_rd_data_vld
-        );
+            RD_DATA_VLD => trbuff_rd_data_vld);
 
     merge_fifo_g: if PCIE_CQ_MFB_REGIONS = 2 generate
-        
-        -- Deserialize metadata for better handling 
-        st_sp_ctrl_mfb_meta_arr     <= slv_array_deser(st_sp_ctrl_mfb_meta, PCIE_CQ_MFB_REGIONS);
+        -- Deserialize metadata for better handling
         st_sp_ctrl_mfb_data_arr     <= slv_array_deser(st_sp_ctrl_mfb_data, PCIE_CQ_MFB_REGIONS);
 
         -- Insert data for each DMA header
