@@ -47,6 +47,9 @@ class env #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, CHANNELS, PCIE_MTU, DA
         m_env_rx_cfg.interface_name = m_config.interface_name;
         m_env_rx_cfg.meta_behav     = uvm_logic_vector_array_mfb::config_item::META_SOF;
 
+        m_env_rx_cfg.seq_cfg = new();
+        m_env_rx_cfg.seq_cfg.straddling = 1;
+
         uvm_config_db #(uvm_logic_vector_array_mfb::config_item)::set(this, "m_env_rx", "m_config", m_env_rx_cfg);
         m_env_rx  = uvm_logic_vector_array_mfb::env_rx #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)::type_id::create("m_env_rx", this);
 
