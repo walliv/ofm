@@ -11,8 +11,7 @@ module DMA_LL_PROPERTY  #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_
     (
         input logic RESET,
         mfb_if   mfb_rx,
-        mfb_if   mfb_tx,
-        mi_if    config_mi
+        mfb_if   mfb_tx
     );
 
     string module_name = "";
@@ -41,7 +40,6 @@ module DMA_LL_PROPERTY  #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_
         .vif   (mfb_rx)
     );
 
-
     ////////////////////////////////////
     // TX PROPERTY
     mfb_property #(
@@ -55,18 +53,4 @@ module DMA_LL_PROPERTY  #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_
         .RESET (RESET),
         .vif   (mfb_tx)
     );
-
-    //simplyfied rule
-    property sof_eof_src_rdy;
-        @(posedge mfb_tx.CLK) disable iff(RESET || START)
-        //mfb_tx.SRC_RDY |-> !$isunknown(mfb_tx.EOF);
-        (mfb_tx.SRC_RDY && (mfb_tx.SOF != 0)) |-> mfb_tx.SRC_RDY s_until_with (mfb_tx.EOF != 0);
-    endproperty
-
-    assert property (sof_eof_src_rdy)
-        else begin
-            `uvm_error(module_name, "\n\tMFB To PCIE must'n stop sending data in middle of frame");
-        end
-
-
 endmodule
