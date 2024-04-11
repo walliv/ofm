@@ -58,9 +58,9 @@ class speed extends base;
                       PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_LEN_MAX,
                       CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_POINTER_WIDTH) m_env;
     bit            timeout;
-    uvm_reg_data_t dma_cnt          [CHANNELS];
+    uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
-    uvm_reg_data_t discard_dma_cnt  [CHANNELS];
+    uvm_reg_data_t discard_pkt_cnt  [CHANNELS];
     uvm_reg_data_t discard_byte_cnt [CHANNELS];
     uvm_status_e   status_r;
 
@@ -111,20 +111,20 @@ class speed extends base;
         for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
 
             m_env.m_regmodel.m_regmodel.channel[chan].sent_packets.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].sent_packets.read(status_r, dma_cnt[chan]);
+            m_env.m_regmodel.m_regmodel.channel[chan].sent_packets.read(status_r, pkt_cnt[chan]);
             m_env.m_regmodel.m_regmodel.channel[chan].sent_bytes.write(status_r, {32'h1, 32'h1});
             m_env.m_regmodel.m_regmodel.channel[chan].sent_bytes.read(status_r, byte_cnt[chan]);
 
             m_env.m_regmodel.m_regmodel.channel[chan].discarded_packets.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].discarded_packets.read(status_r, discard_dma_cnt[chan]);
+            m_env.m_regmodel.m_regmodel.channel[chan].discarded_packets.read(status_r, discard_pkt_cnt[chan]);
             m_env.m_regmodel.m_regmodel.channel[chan].discarded_bytes.write(status_r, {32'h1, 32'h1});
             m_env.m_regmodel.m_regmodel.channel[chan].discarded_bytes.read(status_r, discard_byte_cnt[chan]);
 
             m_env.sc.byte_cnt[chan]         = byte_cnt[chan];
-            m_env.sc.dma_cnt[chan]          = dma_cnt[chan];
+            m_env.sc.pkt_cnt[chan]          = pkt_cnt[chan];
             m_env.sc.discard_byte_cnt[chan] = discard_byte_cnt[chan];
-            m_env.sc.discard_dma_cnt[chan]  = discard_dma_cnt[chan];
 
+            m_env.sc.discard_pkt_cnt[chan]  = discard_pkt_cnt[chan];
         end
 
         phase.drop_objection(this);
