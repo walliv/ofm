@@ -117,11 +117,7 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     -- =============================================================================================
     -- FSM declarations
     -- =============================================================================================
-    type request_fsm_t is (S_IDLE, S_WR_FIFO, S_RD_DLY, S_RD_FIFO);
-    signal req_fsm_pst      : request_fsm_t := S_IDLE;
-    signal req_fsm_nst      : request_fsm_t := S_IDLE;
-
-    type pkt_dispatch_state_t is (S_IDLE, S_PKT_MIDDLE, S_UPDATE_STATUS);
+    type pkt_dispatch_state_t is (S_IDLE, S_PKT_BEGIN, S_PKT_MIDDLE, S_UPDATE_STATUS);
     signal pkt_dispatch_pst : pkt_dispatch_state_t := S_IDLE;
     signal pkt_dispatch_nst : pkt_dispatch_state_t := S_IDLE;
 
@@ -135,26 +131,24 @@ architecture FULL of TX_DMA_PKT_DISPATCHER is
     signal disp_fsm_mfb_eof     : std_logic_vector(USR_MFB_EOF'range);
     signal disp_fsm_mfb_eof_pos : std_logic_vector(USR_MFB_EOF_POS'range);
     signal disp_fsm_mfb_src_rdy : std_logic;
-    signal mfb_dst_rdy_reg      : std_logic;
-    signal buff_rd_data_reg     : std_logic_vector(BUFF_RD_DATA'range);
 
     signal fr_len_round_up_msk  : unsigned(16 -1 downto 0);
     signal fr_len_rounded       : unsigned(16 -1 downto 0);
 begin
     -- =============================================================================================
-    -- Output Logic
+    -- FSM controlling output MFB signals
     -- =============================================================================================
     pkt_dispatch_fsm_reg_p : process (CLK) is
     begin
         if (rising_edge(CLK)) then
             if (RESET = '1') then
                 pkt_dispatch_pst <= S_IDLE;
-                addr_cntr_pst    <= (others => '0');
                 byte_cntr_pst    <= (others => '0');
+                addr_cntr_pst    <= (others => '0');
             elsif (USR_MFB_DST_RDY = '1') then
                 pkt_dispatch_pst <= pkt_dispatch_nst;
-                addr_cntr_pst    <= addr_cntr_nst;
                 byte_cntr_pst    <= byte_cntr_nst;
+                addr_cntr_pst    <= addr_cntr_nst;
             end if;
         end if;
     end process;
@@ -171,15 +165,20 @@ begin
         case pkt_dispatch_pst is
             when S_IDLE =>
                 if (HDR_BUFF_SRC_RDY = '1' and ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
-                    if (dma_hdr_frame_length_v > (USR_MFB_DATA'length /8)) then
-                        pkt_dispatch_nst <= S_PKT_MIDDLE;
-                    else
+                    pkt_dispatch_nst <= S_PKT_BEGIN;
+                end if;
+
+            when S_PKT_BEGIN =>
+                if (BUFF_RD_DATA_VLD = '1') then
+                    if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
                         pkt_dispatch_nst <= S_UPDATE_STATUS;
+                    else
+                        pkt_dispatch_nst <= S_PKT_MIDDLE;
                     end if;
                 end if;
 
             when S_PKT_MIDDLE =>
-                if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
+                if (byte_cntr_pst <= (USR_MFB_DATA'length /8) and BUFF_RD_DATA_VLD = '1') then
                     pkt_dispatch_nst <= S_UPDATE_STATUS;
                 end if;
 
@@ -220,40 +219,56 @@ begin
                 -- Change to common signal
                 if (HDR_BUFF_SRC_RDY = '1') then
                     if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '0') then
-                        HDR_BUFF_DST_RDY <= USR_MFB_DST_RDY;
+                        -- NOTE: this was previously USR_MFB_DST_RDY
+                        HDR_BUFF_DST_RDY <= '1';
                     else
-                        disp_fsm_mfb_sof     <= "1";
-                        disp_fsm_mfb_src_rdy <= '1';
+                        addr_cntr_nst <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range) + (USR_MFB_DATA'length /8);
+                        byte_cntr_nst <= resize(dma_hdr_frame_length_v, byte_cntr_nst'length);
 
                         BUFF_RD_ADDR <= std_logic_vector(dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range));
-                        BUFF_RD_EN   <= '1';
-
-                        -- When the packet, according to its length, fits in the output word, then
-                        -- assign EOF and do not count next address for the reading.
-                        if (dma_hdr_frame_length_v <= (USR_MFB_DATA'length /8)) then
-                            addr_cntr_nst        <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range);
-                            disp_fsm_mfb_eof     <= "1";
-                            -- take only the lower bits from the frame length
-                            disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
-                        else
-                            addr_cntr_nst <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range) + (USR_MFB_DATA'length /8);
-                            byte_cntr_nst <= resize(dma_hdr_frame_length_v, byte_cntr_nst'length) - (USR_MFB_DATA'length /8);
-                        end if;
+                        BUFF_RD_EN <= '1';
                     end if;
                 end if;
 
+            when S_PKT_BEGIN =>
+
+                BUFF_RD_EN <= USR_MFB_DST_RDY;
+
+                if (BUFF_RD_DATA_VLD = '1') then
+                    addr_cntr_nst        <= addr_cntr_pst + (USR_MFB_DATA'length /8);
+                    byte_cntr_nst        <= byte_cntr_pst - (USR_MFB_DATA'length /8);
+
+                    disp_fsm_mfb_sof     <= "1";
+                    disp_fsm_mfb_src_rdy <= '1';
+
+                    -- When the packet, according to its length, fits in the output word, then
+                    -- assign EOF and do not count next address for the reading.
+                    if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
+                        disp_fsm_mfb_eof     <= "1";
+                        -- take only the lower bits from the frame length
+                        disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+                    end if;
+                else
+                    BUFF_RD_ADDR <= std_logic_vector(addr_cntr_pst - (USR_MFB_DATA'length /8));
+                end if;
+
+
             when S_PKT_MIDDLE =>
 
-                addr_cntr_nst        <= addr_cntr_pst + (USR_MFB_DATA'length /8);
-                byte_cntr_nst        <= byte_cntr_pst - (USR_MFB_DATA'length /8);
-                disp_fsm_mfb_src_rdy <= '1';
-                
-                -- Change to common signal
-                BUFF_RD_EN         <= '1';
+                BUFF_RD_EN <= USR_MFB_DST_RDY;
 
-                if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
-                    disp_fsm_mfb_eof     <= "1";
-                    disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+                if (BUFF_RD_DATA_VLD = '1') then
+                    addr_cntr_nst        <= addr_cntr_pst + (USR_MFB_DATA'length /8);
+                    byte_cntr_nst        <= byte_cntr_pst - (USR_MFB_DATA'length /8);
+
+                    disp_fsm_mfb_src_rdy <= '1';
+
+                    if (byte_cntr_pst <= (USR_MFB_DATA'length /8)) then
+                        disp_fsm_mfb_eof     <= "1";
+                        disp_fsm_mfb_eof_pos <= std_logic_vector(dma_hdr_frame_length_v(USR_MFB_EOF_POS'range) - 1);
+                    end if;
+                else
+                    BUFF_RD_ADDR <= std_logic_vector(addr_cntr_pst - (USR_MFB_DATA'length /8));
                 end if;
 
             when S_UPDATE_STATUS =>
@@ -270,7 +285,7 @@ begin
     PKT_SENT_BYTES <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(PKT_SENT_BYTES'range);
 
     fr_len_round_up_msk <= not to_unsigned(31,16);
-    fr_len_rounded <= (unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH)) + 31) and fr_len_round_up_msk;
+    fr_len_rounded      <= (unsigned(HDR_BUFF_DATA(DMA_FRAME_LENGTH)) + 31) and fr_len_round_up_msk;
 
     UPD_HDP_CHAN <= HDR_BUFF_CHAN;
     UPD_HDP_DATA <= std_logic_vector(resize(fr_len_rounded + unsigned(HDR_BUFF_DATA(DMA_FRAME_PTR)), DATA_POINTER_WIDTH));
@@ -283,11 +298,9 @@ begin
     begin
         if (rising_edge(CLK)) then
             if (RESET = '1') then
-                USR_MFB_SOF     <= (others => '0');
-                USR_MFB_EOF     <= (others => '0');
-                USR_MFB_EOF_POS <= (others => '0');
                 USR_MFB_SRC_RDY <= '0';
             elsif (USR_MFB_DST_RDY = '1') then
+                USR_MFB_DATA    <= BUFF_RD_DATA;
                 USR_MFB_SOF     <= disp_fsm_mfb_sof;
                 USR_MFB_EOF     <= disp_fsm_mfb_eof;
                 USR_MFB_EOF_POS <= disp_fsm_mfb_eof_pos;
@@ -300,24 +313,5 @@ begin
     USR_MFB_META_CHAN     <= HDR_BUFF_CHAN;
     USR_MFB_META_PKT_SIZE <= HDR_BUFF_DATA(DMA_FRAME_LENGTH)(USR_MFB_META_PKT_SIZE'range);
 
-    USR_MFB_DATA    <= BUFF_RD_DATA when mfb_dst_rdy_reg = '1' else buff_rd_data_reg;
     USR_MFB_SOF_POS <= (others => '0');
-
-    mfb_dst_rdy_reg_p : process (CLK) is
-    begin
-        if (rising_edge(CLK)) then
-            mfb_dst_rdy_reg <= USR_MFB_DST_RDY;
-        end if;
-    end process;
-
-    buff_rd_data_reg_p : process (CLK) is
-    begin
-        if (rising_edge(CLK)) then
-            if (RESET = '1') then
-                buff_rd_data_reg <= (others => '0');
-            elsif (mfb_dst_rdy_reg = '1') then
-                buff_rd_data_reg <= BUFF_RD_DATA;
-            end if;
-        end if;
-    end process;
 end architecture;
