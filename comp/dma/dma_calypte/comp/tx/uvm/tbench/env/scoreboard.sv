@@ -4,86 +4,7 @@
 
 //-- SPDX-License-Identifier: BSD-3-Clause
 
-class stats;
-
-    local real min;
-    local real max;
-    local real sum;
-    local real sum2;
-    local real values_q[$];
-
-    int unsigned values;
-
-    function new();
-        values = 0;
-        sum  = 0;
-        sum2 = 0;
-    endfunction
-
-    function void count(output real min, real max, real avg, real std_dev, real median, real modus);
-        real avg_local;
-        real tmp_mod;
-        int unsigned cnt_mod = 0;
-        int unsigned tmp_cnt = 0;
-
-        min = this.min;
-        max = this.max;
-
-        avg_local = sum/values;
-        avg = avg_local;
-
-        std_dev = (1.0/(values-1)*(sum2 - values*(avg_local**2)))**0.5;
-        values_q.sort();
-        if (values % 2 == 0) begin
-            median = (values_q[values/2] + values_q[(values/2)+1])/2;
-        end else if (values % 2 == 1) begin
-            median = values_q[(values/2)+1];
-        end
-        for (int unsigned it = 0; it < values_q.size(); it++) begin
-            if (tmp_mod == 0) begin
-                tmp_mod = values_q[it];
-            end
-
-            if (tmp_mod == values_q[it]) begin
-                cnt_mod++;
-            end else begin
-                tmp_mod = values_q[it];
-                if (tmp_cnt == 0) begin
-                    tmp_cnt = cnt_mod;
-                    modus = tmp_mod;
-                end else begin
-                    if (cnt_mod > tmp_cnt) begin
-                        tmp_cnt = cnt_mod;
-                        modus = tmp_mod;
-                    end
-                end
-                cnt_mod = 0;
-            end
-        end
-    endfunction
-
-    function void next_val(real val);
-        values_q.push_back(val);
-        if (values == 0) begin
-            min = val;
-            max = val;
-        end else begin
-            if (min > val) begin
-                min = val;
-            end
-
-            if (max < val) begin
-               max = val;
-            end
-        end
-
-        sum   += val;
-        sum2  += val**2;
-
-        values++;
-    endfunction
-endclass
-
+/*
 class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
     `uvm_component_utils(uvm_dma_ll::compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS))
 
@@ -94,7 +15,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
 
     int unsigned errors;
     int unsigned compared;
-    stats        m_delay;
+    uvm_common::stats m_delay;
 
     function new(string name, uvm_component parent);
         super.new(name, parent);
@@ -221,20 +142,19 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
             //count stats
             //Count delay if you get first data packet.
             m_delay.next_val((tr_dut_mfb.start["dut mfb out"] - tr_model_mfb.start["model mfb out"])/1ns);
-
         end
     endtask
 endclass
-
+*/
 class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
                    DATA_ADDR_W) extends uvm_scoreboard;
     `uvm_component_param_utils(uvm_dma_ll::scoreboard #(CHANNELS, USR_ITEM_WIDTH,
                                                         USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADDR_W))
 
     //INPUT TO DUT
-    uvm_analysis_export #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))                   analysis_export_rx_packet;
-    uvm_analysis_export #(uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)) analysis_export_rx_meta;
-    uvm_analysis_export #(uvm_logic_vector::sequence_item#(1))                                     analysis_export_dma;
+    uvm_common::subscriber #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))                   analysis_export_rx_packet;
+    uvm_common::subscriber #(uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)) analysis_export_rx_meta;
+    uvm_analysis_export #(uvm_logic_vector::sequence_item#(1))                                        analysis_export_dma;
     //DUT OUTPUT
     uvm_analysis_export #(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) analysis_export_tx_packet;
     uvm_analysis_export #(uvm_logic_vector::sequence_item#(USER_META_WIDTH))      analysis_export_tx_meta;
@@ -243,8 +163,10 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
             DATA_ADDR_W) m_model;
 
-    local uvm_dma_regs::regmodel#(CHANNELS) m_regmodel;
-    uvm_dma_ll::compare #(USR_ITEM_WIDTH, USER_META_WIDTH, CHANNELS) tr_compare;
+    local uvm_dma_regs::regmodel#(CHANNELS)   m_regmodel;
+    uvm_common::comparer_ordered#(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) data_cmp;
+    uvm_common::comparer_ordered#(uvm_logic_vector::sequence_item#(USER_META_WIDTH))      meta_cmp;
+    //uvm_dma_ll::compare #(USR_ITEM_WIDTH, USER_META_WIDTH, CHANNELS) tr_compare;
 
     local int unsigned compared;
     local int unsigned errors;
@@ -255,9 +177,9 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     uvm_reg_data_t discard_byte_cnt [CHANNELS];
     uvm_status_e   status_r;
 
-    local stats                                                                           m_input_speed;
-    local stats                                                                           m_delay;
-    local stats                                                                           m_output_speed;
+    local uvm_common::stats  m_input_speed;
+    local uvm_common::stats  m_delay;
+    local uvm_common::stats  m_output_speed;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) tx_speed_meter;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))  rx_speed_meter;
 
@@ -265,8 +187,8 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     function new(string name, uvm_component parent);
         super.new(name, parent);
         // DUT MODEL COMUNICATION
-        analysis_export_rx_packet = new("analysis_export_rx_packet", this);
-        analysis_export_rx_meta   = new("analysis_export_rx_meta"  , this);
+        //analysis_export_rx_packet = new("analysis_export_rx_packet", this);
+        //analysis_export_rx_meta   = new("analysis_export_rx_meta"  , this);
         analysis_export_tx_packet = new("analysis_export_tx_packet", this);
         tx_speed_meter            = new("tx_speed_meter"           , this);
         analysis_export_tx_meta   = new("analysis_export_tx_meta"  , this);
@@ -283,12 +205,9 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
 
     function int unsigned used();
         int unsigned ret = 0;
-
-        ret |= tr_compare.model_mfb.used()  != 0;
-        ret |= tr_compare.model_meta.used() != 0;
-        ret |= tr_compare.dut_mfb.used()    != 0;
-        ret |= tr_compare.dut_meta.used()   != 0;
-
+        ret |= m_model.used() != 0;
+        ret |= data_cmp.used() != 0;
+        ret |= meta_cmp.used() != 0;
         return ret;
     endfunction
 
@@ -299,22 +218,27 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
 
     //build phase
     function void build_phase(uvm_phase phase);
-        m_model = model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADDR_W)::type_id::create("m_model", this);
-        tr_compare = uvm_dma_ll::compare#(USR_ITEM_WIDTH, USER_META_WIDTH, CHANNELS)::type_id::create("tr_compare", this);
+        m_model  = model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADDR_W)::type_id::create("m_model", this);
+        data_cmp = uvm_common::comparer_ordered#(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH))::type_id::create("data_cmp", this);
+        meta_cmp = uvm_common::comparer_ordered#(uvm_logic_vector::sequence_item#(USER_META_WIDTH))::type_id::create("meta_cmp", this);
+        //tr_compare = uvm_dma_ll::compare#(USR_ITEM_WIDTH, USER_META_WIDTH, CHANNELS)::type_id::create("tr_compare", this);
+
+        analysis_export_rx_packet =    uvm_common::subscriber #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))                  ::type_id::create("analysis_export_rx_packet",this);
+        analysis_export_rx_meta   =    uvm_common::subscriber #(uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::type_id::create("analysis_export_rx_meta",this);
     endfunction
 
     function void connect_phase(uvm_phase phase);
-        analysis_export_rx_packet.connect(m_model.analysis_imp_rx.analysis_export);
-        analysis_export_rx_packet.connect(rx_speed_meter.analysis_export);
-        analysis_export_rx_meta.connect(m_model.analysis_imp_rx_meta.analysis_export);
+        analysis_export_rx_packet.port.connect(m_model.analysis_imp_rx_data.analysis_export);
+        //analysis_export_rx_packet.port.connect(rx_speed_meter.analysis_export);
+        analysis_export_rx_meta.port.connect(m_model.analysis_imp_rx_meta.analysis_export);
 
-        m_model.analysis_port_tx.connect(tr_compare.model_mfb.analysis_export);
-        m_model.analysis_port_meta_tx.connect(tr_compare.model_meta.analysis_export);
+        m_model.analysis_port_tx_data.connect(data_cmp.analysis_imp_model);
+        m_model.analysis_port_tx_meta.connect(meta_cmp.analysis_imp_model);
 
-        analysis_export_tx_packet.connect(tr_compare.dut_mfb.analysis_export);
+        analysis_export_tx_packet.connect(data_cmp.analysis_imp_dut);
         analysis_export_tx_packet.connect(tx_speed_meter.analysis_export);
-        analysis_export_tx_meta.connect(tr_compare.dut_meta.analysis_export);
-        tr_compare.m_delay = m_delay;
+        analysis_export_tx_meta.connect(meta_cmp.analysis_imp_dut);
+        //tr_compare.m_delay = m_delay;
         analysis_export_dma.connect(m_model.discard_comp.analysis_imp_rx_dma.analysis_export);
     endfunction
 
@@ -383,15 +307,15 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
         real modus;
         string msg = "\n";
 
-        errors   = tr_compare.errors;
-        compared = tr_compare.compared;
+        //errors   = tr_compare.errors;
+        //compared = tr_compare.compared;
 
         if (this.get_report_verbosity_level() >= UVM_LOW) begin
-            m_delay.count(min, max, avg, std_dev, median, modus);
-            $swrite(msg, "%s\n\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns", msg, min, max, avg, std_dev, median, modus);
-            m_input_speed.count(min, max, avg, std_dev, median, modus);
+            //m_delay.count(min, max, avg, std_dev, median, modus);
+            //$swrite(msg, "%s\n\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns", msg, min, max, avg, std_dev, median, modus);
+            m_input_speed.count(min, max, avg, std_dev);
             $swrite(msg, "%s\n\tSpeed input  statistic (PCIE RX)  => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
-            m_output_speed.count(min, max, avg, std_dev, median, modus);
+            m_output_speed.count(min, max, avg, std_dev);
             $swrite(msg, "%s\n\tSpeed output statistic (MFB TX) => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
         end
 
@@ -400,37 +324,37 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
             $swrite(msg, "%s================================================================================= \n", msg);
             $swrite(msg, "%s\nEXPORT USED                        \n", msg                                             );
             $swrite(msg, "%s================================================================================= \n", msg);
-            $swrite(msg, "%sMODEL_MFB.USED  %d\n", msg, tr_compare.model_mfb.used()                                   );
-            $swrite(msg, "%sMODEL_META.USED %d\n", msg, tr_compare.model_meta.used()                                  );
-            $swrite(msg, "%sDUT_MFB.USED    %d\n", msg, tr_compare.dut_mfb.used()                                     );
-            $swrite(msg, "%sDUT_META.USED   %d\n", msg, tr_compare.dut_meta.used()                                    );
+            //$swrite(msg, "%sMODEL_MFB.USED  %d\n", msg, tr_compare.model_mfb.used()                                   );
+            //$swrite(msg, "%sMODEL_META.USED %d\n", msg, tr_compare.model_meta.used()                                  );
+            //$swrite(msg, "%sDUT_MFB.USED    %d\n", msg, tr_compare.dut_mfb.used()                                     );
+            //$swrite(msg, "%sDUT_META.USED   %d\n", msg, tr_compare.dut_meta.used()                                    );
             $swrite(msg, "%s================================================================================= \n", msg);
 
             for (int chan = 0; chan < CHANNELS; chan++) begin
 
-                if (byte_cnt[chan] != m_model.cnt_reg[chan].byte_cnt &&
-                    pkt_cnt[chan]  != m_model.cnt_reg[chan].pkt_cnt) begin
-                    string msg_1;
-                    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, byte_cnt[chan], m_model.cnt_reg[chan].byte_cnt);
-                    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, pkt_cnt[chan], m_model.cnt_reg[chan].pkt_cnt);
-                    `uvm_error(this.get_full_name(), msg_1);
-                end
+                //if (byte_cnt[chan] != m_model.cnt_reg[chan].byte_cnt &&
+                //    pkt_cnt[chan]  != m_model.cnt_reg[chan].pkt_cnt) begin
+                //    string msg_1;
+                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, byte_cnt[chan], m_model.cnt_reg[chan].byte_cnt);
+                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, pkt_cnt[chan], m_model.cnt_reg[chan].pkt_cnt);
+                //    `uvm_error(this.get_full_name(), msg_1);
+                //end
 
-                if (discard_byte_cnt[chan] != m_model.cnt_reg[chan].discard_byte_cnt &&
-                    discard_pkt_cnt[chan]  != m_model.cnt_reg[chan].discard_pkt_cnt) begin
-                    string msg_1;
-                    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_byte_cnt[chan], m_model.cnt_reg[chan].discard_byte_cnt);
-                    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_pkt_cnt[chan], m_model.cnt_reg[chan].discard_pkt_cnt);
-                    `uvm_error(this.get_full_name(), msg_1);
-                end
+                //if (discard_byte_cnt[chan] != m_model.cnt_reg[chan].discard_byte_cnt &&
+                //    discard_pkt_cnt[chan]  != m_model.cnt_reg[chan].discard_pkt_cnt) begin
+                //    string msg_1;
+                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_byte_cnt[chan], m_model.cnt_reg[chan].discard_byte_cnt);
+                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_pkt_cnt[chan], m_model.cnt_reg[chan].discard_pkt_cnt);
+                //    `uvm_error(this.get_full_name(), msg_1);
+                //end
 
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.cnt_reg[chan].pkt_cnt                        );
-                $swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.cnt_reg[chan].byte_cnt                       );
-                $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.cnt_reg[chan].discard_pkt_cnt                );
-                $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.cnt_reg[chan].discard_byte_cnt               );
+                //$swrite(msg, "%s================================================================================= \n", msg);
+                //$swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
+                //$swrite(msg, "%s================================================================================= \n", msg);
+                //$swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.cnt_reg[chan].pkt_cnt                        );
+                //$swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.cnt_reg[chan].byte_cnt                       );
+                //$swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.cnt_reg[chan].discard_pkt_cnt                );
+                //$swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.cnt_reg[chan].discard_byte_cnt               );
                 $swrite(msg, "%s================================================================================= \n", msg);
                 $swrite(msg, "%s\nDUT COUNTERS STATISTICS\n", msg                                                         );
                 $swrite(msg, "%s================================================================================= \n", msg);
