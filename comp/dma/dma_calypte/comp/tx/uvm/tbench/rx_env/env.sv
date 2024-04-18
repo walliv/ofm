@@ -9,9 +9,7 @@ class env #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, CHANNELS, PCIE_MTU, DA
 
     sequencer                                                         m_sequencer[CHANNELS];
     driver #(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) m_driver[CHANNELS];
-    //low level
 
-    //implement later
     uvm_reset::sync_cbs reset_sync;
     uvm_logic_vector_array_mfb::env_rx #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_env_rx;
 
