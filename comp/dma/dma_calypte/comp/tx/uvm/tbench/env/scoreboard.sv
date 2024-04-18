@@ -107,7 +107,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
         compared   = 0;
     endfunction
 
-    task write_meta(uvm_logic_vector::sequence_item#(USER_META_WIDTH)  tr_model_meta,
+    task print_meta_compare_error(uvm_logic_vector::sequence_item#(USER_META_WIDTH)  tr_model_meta,
                     uvm_logic_vector::sequence_item#(USER_META_WIDTH)  tr_dut_meta);
 
         string msg;
@@ -125,7 +125,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
         `uvm_error(this.get_full_name(), msg);
     endtask
 
-    task write_data(uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) tr_dut_mfb,
+    task print_data_compare_error(uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) tr_dut_mfb,
                     uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) tr_model_mfb,
                     uvm_logic_vector::sequence_item#(USER_META_WIDTH)  tr_model_meta);
 
@@ -194,7 +194,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
 
                     if (tr_model_meta_comp.compare(tr_dut_meta_comp) == 0) begin
                         errors++;
-                        write_meta(tr_model_meta_comp, tr_dut_meta_comp);
+                        print_meta_compare_error(tr_model_meta_comp, tr_dut_meta_comp);
                     end
                 end
 
@@ -204,7 +204,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
 
                     if (tr_model_mfb_comp.compare(tr_dut_mfb_comp) == 0) begin
                         errors++;
-                        write_data(tr_dut_mfb_comp, tr_model_mfb_comp, tr_model_meta_comp);
+                        print_data_compare_error(tr_dut_mfb_comp, tr_model_mfb_comp, tr_model_meta_comp);
                     end
                 end
             end
