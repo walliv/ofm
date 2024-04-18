@@ -39,8 +39,6 @@ endclass
 class driver_sync#(ITEM_WIDTH, META_WIDTH);
 
     local semaphore sem;
-    //local uvm_logic_vector::sequence_item#(META_WIDTH)       pcie_meta[$];
-    //local uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) pcie_data[$];
     mailbox#(uvm_logic_vector::sequence_item#(META_WIDTH))       pcie_meta;
     mailbox#(uvm_logic_vector_array::sequence_item#(ITEM_WIDTH)) pcie_data;
 
@@ -51,26 +49,13 @@ class driver_sync#(ITEM_WIDTH, META_WIDTH);
     endfunction
 
     task put(int unsigned id, uvm_logic_vector::sequence_item#(META_WIDTH) meta, uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) data);
-        //wait(pcie_meta.size() != 0 || pcie_data.size() != 0);
         wait(pcie_meta.num() == 0 || pcie_data.num() == 0);
 
         sem.get(1);
-        //pcie_meta.push_back(meta);
-        //pcie_data.push_back(data);
         pcie_meta.put(meta);
         pcie_data.put(data);
         sem.put(1);
     endtask
-
-    //task get_meta(output uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) meta);
-    //    wait(pcie_meta.size() != 0);
-    //    meta = pcie_meta.pop_back();
-    //endtask
-
-    //task get_data(uvm_logic_vector_array::sequence_item#(ITEM_WIDTH) data);
-    //    wait(pcie_data.size() != 0);
-    //    data = pcie_data.pop_back();
-    //endtask
 endclass
 
 
@@ -123,13 +108,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
                 it++;
             end
         end
-        /*casex (be)
-            4'b0000 : ret = 0;
-            4'bxxx1 : ret = 0;
-            4'bxx10 : ret = 1;
-            4'bx100 : ret = 2;
-            4'b1000 : ret = 3;
-        endcase*/
         return it;
     endfunction
 
@@ -141,13 +119,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
                 it--;
             end;
         end
-        /*casex (be)
-            4'b0000 : ret = 4;
-            4'b1xxx : ret = 4;
-            4'b01xx : ret = 3;
-            4'b001x : ret = 2;
-            4'b0001 : ret = 1;
-        endcase*/
         return it;
     endfunction
 
@@ -298,14 +269,11 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
             int unsigned rand_ret;
 
             //GENERATE RANDOM SIZE OF BLOCKS
-            //pcie_len = 256; //$urandom_range(256, 1);
-            //pcie_len = $urandom_range(256, 1);
             rand_ret = std::randomize(pcie_len) with {pcie_len dist {[1:63] :/ 75, [64:PCIE_MTU/2-1] :/ 15,  [PCIE_MTU/2:PCIE_MTU-1] :/ 8, PCIE_MTU :/ 2}; };
             if (rand_ret == 0) begin
                 pcie_len = 256;
             end
 
-            //lbe =
             fbe = lbe_to_fbe(lbe);
             if (packet_len <= (packet_index/(ITEM_WIDTH/8) + pcie_len)) begin
                 pcie_len = packet_len - packet_index/(ITEM_WIDTH/8);
