@@ -31,7 +31,6 @@ class control_register extends uvm_reg;
     endfunction
 endclass
 
-
 class status_register extends uvm_reg;
     `uvm_object_utils(uvm_dma_regs::status_register)
 
@@ -58,7 +57,6 @@ class status_register extends uvm_reg;
                                  );
     endfunction
 endclass
-
 
 class pointer_register extends uvm_reg;
     `uvm_object_utils(uvm_dma_regs::pointer_register)

@@ -20,7 +20,6 @@ class stats;
         sum2 = 0;
     endfunction
 
-
     function void count(output real min, real max, real avg, real std_dev, real median, real modus);
         real avg_local;
         real tmp_mod;
@@ -147,7 +146,6 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
         `uvm_error(this.get_full_name(), msg);
     endtask
 
-
     task run_phase(uvm_phase phase);
         uvm_common::model_item #(uvm_logic_vector_array::sequence_item#(ITEM_WIDTH)) tr_model_mfb;
         uvm_logic_vector::sequence_item#(USER_META_WIDTH)                            tr_model_meta;
@@ -226,7 +224,6 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
 
         end
     endtask
-
 endclass
 
 class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
@@ -258,9 +255,9 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     uvm_reg_data_t discard_byte_cnt [CHANNELS];
     uvm_status_e   status_r;
 
-    local stats  m_input_speed;
-    local stats  m_delay;
-    local stats  m_output_speed;
+    local stats                                                                           m_input_speed;
+    local stats                                                                           m_delay;
+    local stats                                                                           m_output_speed;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) tx_speed_meter;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))  rx_speed_meter;
 
@@ -284,7 +281,7 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
         errors   = 0;
     endfunction
 
-        function int unsigned used();
+    function int unsigned used();
         int unsigned ret = 0;
 
         ret |= tr_compare.model_mfb.used()  != 0;
@@ -319,7 +316,6 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
         analysis_export_tx_meta.connect(tr_compare.dut_meta.analysis_export);
         tr_compare.m_delay = m_delay;
         analysis_export_dma.connect(m_model.discard_comp.analysis_imp_rx_dma.analysis_export);
-
     endfunction
 
     task run_output();
@@ -372,12 +368,10 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     endtask
 
     task run_phase(uvm_phase phase);
-
         fork
             run_output();
             run_input();
         join_none
-
     endtask
 
     function void report_phase(uvm_phase phase);
@@ -402,7 +396,6 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
         end
 
         if (errors == 0 && this.used() == 0) begin
-
 
             $swrite(msg, "%s================================================================================= \n", msg);
             $swrite(msg, "%s\nEXPORT USED                        \n", msg                                             );
@@ -431,7 +424,6 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
                     `uvm_error(this.get_full_name(), msg_1);
                 end
 
-
                 $swrite(msg, "%s================================================================================= \n", msg);
                 $swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
                 $swrite(msg, "%s================================================================================= \n", msg);
@@ -447,7 +439,6 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
                 $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, discard_pkt_cnt[chan]                                );
                 $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, discard_byte_cnt[chan]                               );
                 $swrite(msg, "%s================================================================================= \n", msg);
-
             end
 
             $swrite(msg, "%sCompared packets: %0d", msg, compared);
@@ -458,6 +449,5 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
             $swrite(msg, "%sCompared packets: %0d errors %0d", msg, compared, errors);
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION FAILED       ----\n\t---------------------------------------"}, UVM_NONE)
         end
-
     endfunction
 endclass

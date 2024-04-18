@@ -11,11 +11,9 @@ class sequence_simple extends uvm_sequence#(uvm_dma_ll_rx::sequence_item);
     int unsigned packet_size_min = 64;
     int unsigned packet_size_max = 2048; 
 
-
     function new(string name = "uvm_dma_ll::sequence_simple");
         super.new(name);
     endfunction
-
 
     task body();
         uvm_common::sequence_cfg state;
@@ -60,6 +58,4 @@ class sequence_simple extends uvm_sequence#(uvm_dma_ll_rx::sequence_item);
             stop.start(null);
         end
     endtask
-
 endclass
-

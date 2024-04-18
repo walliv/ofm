@@ -50,19 +50,17 @@ class mfb_rx_speed#(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH) ex
             this.cfg = param_cfg;
         end
 
-
         this.add_sequence(uvm_logic_vector_array_mfb::sequence_full_speed_pcie_rx #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH)::get_type());
     endfunction
 endclass
 
-
 class speed extends base;
     typedef uvm_component_registry#(test::speed, "test::speed") type_id;
-
 
     uvm_dma_ll::env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
                       PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_LEN_MAX,
                       CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_POINTER_WIDTH) m_env;
+
     bit            timeout;
     uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
@@ -129,12 +127,10 @@ class speed extends base;
             m_env.sc.byte_cnt[chan]         = byte_cnt[chan];
             m_env.sc.pkt_cnt[chan]          = pkt_cnt[chan];
             m_env.sc.discard_byte_cnt[chan] = discard_byte_cnt[chan];
-
             m_env.sc.discard_pkt_cnt[chan]  = discard_pkt_cnt[chan];
         end
 
         phase.drop_objection(this);
-
     endtask
 
     task test_wait_timeout(int unsigned time_length);
@@ -154,5 +150,4 @@ class speed extends base;
             `uvm_error(this.get_full_name(), "\n\t===================================================\n\tTIMEOUT SOME PACKET STUCK IN DESIGN\n\t===================================================\n\n");
         end
     endfunction
-
 endclass
