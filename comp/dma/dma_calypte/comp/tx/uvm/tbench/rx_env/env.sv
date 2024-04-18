@@ -75,8 +75,6 @@ class env #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, CHANNELS, PCIE_MTU, DA
 
                 m_driver[chan].seq_item_port.connect(m_sequencer[chan].seq_item_export);
                 m_driver[chan].data_export = data_export;
-                //m_sequencer.m_data[chan] = m_logic_vector_array_agent[chan].m_sequencer;
-                //reset_sync.push_back(m_driver[chan].reset_sync);
                 reset_sync.push_back(m_sequencer[chan].reset_sync);
             end
         end
