@@ -45,5 +45,4 @@ class coverage #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH,META_WIDTH) extend
             $write("Pkt SOF/EOF counts coverage %f %%\n", m_cov_seq_item_sof_eof_count.get_inst_coverage());
         end
     endfunction
-
 endclass

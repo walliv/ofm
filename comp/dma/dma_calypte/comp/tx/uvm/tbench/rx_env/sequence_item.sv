@@ -20,7 +20,6 @@ class sequence_item extends uvm_sequence_item;
         super.new(name);
     endfunction
 
-
     // Properly copy all transaction attributes.
     function void do_copy(uvm_object rhs);
         sequence_item rhs_;
