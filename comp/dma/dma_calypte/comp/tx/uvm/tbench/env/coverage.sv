@@ -9,10 +9,9 @@ class coverage #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH,META_WIDTH) extend
     `uvm_component_param_utils(uvm_dma_ll::coverage #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH))
 
     covergroup m_cov_seq_item_sof_eof_count with function sample(uvm_mfb::sequence_item #(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH) seq_item);
-        // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // -----------------------------------------------------------------------------
         // Coverage of packet begins
-        // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        // The input packets .
+        // -----------------------------------------------------------------------------
         sof_count : coverpoint seq_item.sof iff (seq_item.src_rdy & seq_item.dst_rdy) {
             bins two_packets         = {2'b11};
             bins one_packet          = {2'b01};
