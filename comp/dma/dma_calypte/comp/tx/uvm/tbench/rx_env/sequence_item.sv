@@ -30,8 +30,8 @@ class sequence_item extends uvm_sequence_item;
         end
         // Now copy all attributes
         super.do_copy(rhs);
-        packet   = rhs_.packet;
-        meta = meta;
+        packet = rhs_.packet;
+        meta   = rhs_.meta;
     endfunction: do_copy
 
     // Properly compare all transaction attributes representing output pins.
@@ -47,7 +47,7 @@ class sequence_item extends uvm_sequence_item;
         ret = super.do_compare(rhs, comparer);
         // Using simple equivalence operator (faster).
         ret &= (packet === rhs_.packet);
-        ret &= (meta  === meta);
+        ret &= (meta  === rhs_.meta);
         return ret;
     endfunction: do_compare
 
