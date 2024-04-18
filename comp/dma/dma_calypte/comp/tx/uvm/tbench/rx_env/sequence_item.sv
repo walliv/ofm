@@ -46,9 +46,9 @@ class sequence_item extends uvm_sequence_item;
         end
 
         ret = super.do_compare(rhs, comparer);
-        ret = (packet === rhs_.packet);
-        ret = (meta  === meta);
         // Using simple equivalence operator (faster).
+        ret &= (packet === rhs_.packet);
+        ret &= (meta  === meta);
         return ret;
     endfunction: do_compare
 
