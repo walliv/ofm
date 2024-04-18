@@ -25,7 +25,7 @@ module testbench;
     reset_if                                                                                                                                      reset     (CLK);
     mfb_if #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH)                       mfb_tx    (CLK);
     mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) mfb_rx    (CLK);
-    mvb_if #(1, 1)                                                                                                                                mvb_dma   (CLK);
+    mvb_if #(PCIE_CQ_MFB_REGIONS, 1)                                                                                                              mvb_dma   (CLK);
     mi_if #(MI_WIDTH, MI_WIDTH)                                                                                                                   mi_config (CLK);
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ module testbench;
         uvm_config_db#(virtual mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::set(null, "", "vif_rx", mfb_rx);
         uvm_config_db#(virtual mi_if #(MI_WIDTH, MI_WIDTH))::set(null, "", "vif_mi", mi_config);
         uvm_config_db#(virtual mfb_if #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH))::set(null, "", "vif_tx", mfb_tx);
-        uvm_config_db#(virtual mvb_if #(1, 1))::set(null, "", "vif_dma", mvb_dma);
+        uvm_config_db#(virtual mvb_if #(PCIE_CQ_MFB_REGIONS, 1))::set(null, "", "vif_dma", mvb_dma);
 
         m_root = uvm_root::get();
         m_root.finish_on_completion = 0;

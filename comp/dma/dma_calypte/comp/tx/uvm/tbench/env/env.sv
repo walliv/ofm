@@ -23,7 +23,7 @@ class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE
                          PCIE_MTU, DATA_PTR_WIDTH, DEVICE)                                                         m_env_rx;
     uvm_logic_vector_array_mfb::env_tx #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE,
                                          USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH)                                  m_env_tx;
-    uvm_logic_vector_mvb::env_tx #(1, 1)                                                                           m_dma;
+    uvm_logic_vector_mvb::env_tx #(PCIE_CQ_MFB_REGIONS, 1)                                                         m_dma;
     uvm_mi::regmodel#(uvm_dma_regs::regmodel#(CHANNELS), MI_WIDTH, MI_WIDTH)                                       m_regmodel;
 
     coverage #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_cover;
@@ -81,7 +81,7 @@ class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE
         m_dma_config.active         = UVM_PASSIVE;
         m_dma_config.interface_name = "vif_dma";
         uvm_config_db #(uvm_logic_vector_mvb::config_item)::set(this, "m_dma", "m_config", m_dma_config);
-        m_dma = uvm_logic_vector_mvb::env_tx #(1, 1)::type_id::create("m_dma", this);
+        m_dma = uvm_logic_vector_mvb::env_tx #(PCIE_CQ_MFB_REGIONS, 1)::type_id::create("m_dma", this);
 
     endfunction
 
