@@ -290,7 +290,7 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
                     }) else `uvm_fatal(this.get_full_name(), "\n\tCannot randomize lbe");
             end
 
-            // COPY DATA TO TEMPORALY VARIABLE
+            // COPY DATA TO TEMPORARY VARIABLE
             data = new[pcie_len];
             data_index = 0;
             void'(std::randomize(data[0]));
@@ -432,7 +432,7 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
 
             debug_msg = "\n";
             debug_msg = {debug_msg, "==========================================================\n"};
-            debug_msg = {debug_msg, $sformatf("Send packet to channle %0d\n", channel)};
+            debug_msg = {debug_msg, $sformatf("Send packet to channel %0d\n", channel)};
             debug_msg = {debug_msg, "==========================================================\n"};
             debug_msg = {debug_msg, req.convert2string()};
             `uvm_info(this.get_full_name(), debug_msg, UVM_FULL);
