@@ -20,13 +20,11 @@ class discard #(CHANNELS) extends uvm_component;
         analysis_imp_rx_dma.get(drop_tr);
         drop = drop_tr.data;
     endtask
-
 endclass
 
 //model
 class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADDR_W) extends uvm_component;
-    `uvm_component_param_utils(uvm_dma_ll::model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH,
-                                                   CQ_ITEM_WIDTH, DATA_ADDR_W))
+    `uvm_component_param_utils(uvm_dma_ll::model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADDR_W))
 
     uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))                            analysis_imp_rx;
     uvm_tlm_analysis_fifo #(uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))          analysis_imp_rx_meta;
@@ -333,7 +331,6 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
                         `uvm_info(this.get_full_name(),                 debug_msg, UVM_MEDIUM)
 
                         cnt_reg[int'(m_pcie_info.channel)].read_valid = 0;
-
                     end
                 end
 
@@ -367,8 +364,6 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
                 end
                 cnt_reg[int'(m_pcie_info.channel)].read_delay_discard++;
             end
-
         end
     endtask
-
 endclass

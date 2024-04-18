@@ -8,6 +8,7 @@
 // This environment containts two mii agents.
 class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, PCIE_CQ_MFB_REGIONS,
             PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_MTU, CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_PTR_WIDTH) extends uvm_env;
+
     `uvm_component_param_utils(uvm_dma_ll::env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
                                                  PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_MTU,
                                                  CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_PTR_WIDTH));
@@ -17,23 +18,21 @@ class env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE
     sequencer#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
               CHANNELS, PKT_SIZE_MAX) m_sequencer;
 
-    uvm_reset::agent m_reset;
+    uvm_reset::agent                                                                                               m_reset;
     uvm_dma_ll_rx::env #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS,
                          PCIE_MTU, DATA_PTR_WIDTH, DEVICE)                                                         m_env_rx;
     uvm_logic_vector_array_mfb::env_tx #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE,
-                                         USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH)                                      m_env_tx;
-    uvm_logic_vector_mvb::env_tx #(1, 1)                                                                               m_dma;
-    uvm_mi::regmodel#(uvm_dma_regs::regmodel#(CHANNELS), MI_WIDTH, MI_WIDTH)                                           m_regmodel;
+                                         USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH)                                  m_env_tx;
+    uvm_logic_vector_mvb::env_tx #(1, 1)                                                                           m_dma;
+    uvm_mi::regmodel#(uvm_dma_regs::regmodel#(CHANNELS), MI_WIDTH, MI_WIDTH)                                       m_regmodel;
 
     coverage #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_cover;
 
-    scoreboard #(CHANNELS, USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH,
-                 DATA_PTR_WIDTH) sc;
+    scoreboard #(CHANNELS, USER_TX_MFB_ITEM_WIDTH, USER_META_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, DATA_PTR_WIDTH) sc;
 
     // Constructor of environment.
     function new(string name, uvm_component parent);
         super.new(name, parent);
-
         m_cover = new("m_cover");
     endfunction
 
