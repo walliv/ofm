@@ -180,7 +180,6 @@ class model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH, DATA_ADD
             $swrite(debug_msg, "%sDFBE      : %d\n", debug_msg, m_pcie_info.fbe[int'(m_pcie_info.channel)]);
             $swrite(debug_msg, "%sLBE       : %b\n", debug_msg, meta_tr.data[171-1 : 167]);
             $swrite(debug_msg, "%sDLBE      : %d\n", debug_msg, m_pcie_info.lbe[int'(m_pcie_info.channel)]);
-            //$swrite(debug_msg, "%sDROP FLAG : %0b\n", debug_msg, (m_model_info.run[0] && discard_comp.drop == 0));
             $swrite(debug_msg, "%sDATA      : %s\n", debug_msg, in_data_tr.convert2string());
             $swrite(debug_msg, "%s================================================================================= \n", debug_msg);
             `uvm_info(this.get_full_name(), debug_msg, UVM_FULL)
