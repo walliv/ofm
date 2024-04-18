@@ -188,6 +188,8 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
             compared++;
 
             for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
+
+                // Comparing METADATA of the output transaction
                 if (tr_model_meta_fifo[chan].size() != 0 && tr_dut_meta_fifo[chan].size() != 0) begin
                     tr_dut_meta_comp   = tr_dut_meta_fifo[chan].pop_front();
                     tr_model_meta_comp = tr_model_meta_fifo[chan].pop_front();
@@ -198,6 +200,7 @@ class compare #(ITEM_WIDTH, USER_META_WIDTH, CHANNELS) extends uvm_component;
                     end
                 end
 
+                // Comparing DATA of the output transaction
                 if (tr_model_mfb_fifo[chan].size() != 0 && tr_dut_mfb_fifo[chan].size() != 0) begin
                     tr_dut_mfb_comp   = tr_dut_mfb_fifo[chan].pop_front();
                     tr_model_mfb_comp = tr_model_mfb_fifo[chan].pop_front();
