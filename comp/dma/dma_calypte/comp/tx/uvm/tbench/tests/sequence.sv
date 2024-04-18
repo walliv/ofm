@@ -12,7 +12,6 @@ class virt_seq#(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, CH
 
     uvm_reset::sequence_start                            m_reset;
 
-    //reg_sequence#(CQ_ITEM_WIDTH, PKT_SIZE_MAX, PCIE_LEN_MIN)                                                               m_reg;
     uvm_dma_ll::sequence_simple                                                                                            m_channel[CHANNELS];
     uvm_sequence#(uvm_mfb::sequence_item #(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, USER_META_WIDTH)) m_pcie;
     logic [CHANNELS-1:0] done;
