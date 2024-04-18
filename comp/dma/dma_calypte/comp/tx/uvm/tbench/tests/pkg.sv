@@ -4,8 +4,8 @@
 
 //-- SPDX-License-Identifier: BSD-3-Clause 
 
-`ifndef SPLITTER_SIMPLE_TEST_SV
-`define SPLITTER_SIMPLE_TEST_SV
+`ifndef TX_DMA_CALYPTE_TEST_SV
+`define TX_DMA_CALYPTE_TEST_SV
 
 package test;
 
