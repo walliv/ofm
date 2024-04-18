@@ -5,6 +5,9 @@
 //-- SPDX-License-Identifier: BSD-3-Clause 
 
 
+// ======================================================================================================
+// Class: Virtual sequence for full speed test
+// ======================================================================================================
 class virt_seq_full_speed#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
                            CHANNELS, PKT_SIZE_MAX) extends virt_seq#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE,
                                                                                                  USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
@@ -28,6 +31,9 @@ class virt_seq_full_speed#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX
     endfunction
 endclass
 
+// ======================================================================================================
+// Class: MFB RX Speed sequence
+// ======================================================================================================
 class mfb_rx_speed#(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH) extends uvm_logic_vector_array_mfb::sequence_lib_pcie_rx#(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH);
   `uvm_object_param_utils(    mfb_rx_speed#(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH))
   `uvm_sequence_library_utils(mfb_rx_speed#(REGIONS, REGION_SIZE, BLOCK_SIZE, ITEM_WIDTH, META_WIDTH))
