@@ -11,7 +11,6 @@ class base extends uvm_test;
     uvm_dma_ll::env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, PCIE_CQ_MFB_REGIONS,
                       PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_LEN_MAX, CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_POINTER_WIDTH) m_env;
 
-    bit            timeout;
     uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
     uvm_reg_data_t discard_pkt_cnt  [CHANNELS];
