@@ -163,7 +163,7 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     model #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
             DATA_ADDR_W) m_model;
 
-    local uvm_dma_regs::regmodel#(CHANNELS)   m_regmodel;
+    local uvm_dma_regs::regmodel#(CHANNELS)                                               m_regmodel;
     uvm_common::comparer_ordered#(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) data_cmp;
     uvm_common::comparer_ordered#(uvm_logic_vector::sequence_item#(USER_META_WIDTH))      meta_cmp;
     //uvm_dma_ll::compare #(USR_ITEM_WIDTH, USER_META_WIDTH, CHANNELS) tr_compare;
@@ -177,9 +177,9 @@ class scoreboard #(CHANNELS, USR_ITEM_WIDTH, USER_META_WIDTH, CQ_ITEM_WIDTH,
     uvm_reg_data_t discard_byte_cnt [CHANNELS];
     uvm_status_e   status_r;
 
-    local uvm_common::stats  m_input_speed;
-    local uvm_common::stats  m_delay;
-    local uvm_common::stats  m_output_speed;
+    local uvm_common::stats                                                               m_input_speed;
+    local uvm_common::stats                                                               m_delay;
+    local uvm_common::stats                                                               m_output_speed;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(USR_ITEM_WIDTH)) tx_speed_meter;
     local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item#(CQ_ITEM_WIDTH))  rx_speed_meter;
 
