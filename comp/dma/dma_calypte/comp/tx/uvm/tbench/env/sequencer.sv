@@ -16,5 +16,4 @@ class sequencer#(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, C
     function new(string name = "virt_sequencer", uvm_component parent);
         super.new(name, parent);
     endfunction
-
 endclass

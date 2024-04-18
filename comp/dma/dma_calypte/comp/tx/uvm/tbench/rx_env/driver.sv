@@ -4,7 +4,6 @@
 
 //-- SPDX-License-Identifier: BSD-3-Clause
 
-
 class driver_data;
     logic [16-1 : 0] hdr_addr;
     logic [16-1 : 0] hdr_mask;
@@ -17,7 +16,6 @@ class driver_data;
         data_addr = 0;
     endfunction
 endclass
-
 
 class status_cbs extends uvm_reg_cbs;
     driver_data data;
@@ -33,8 +31,6 @@ class status_cbs extends uvm_reg_cbs;
         end
     endtask
 endclass
-
-
 
 class driver_sync#(ITEM_WIDTH, META_WIDTH);
 
@@ -58,14 +54,12 @@ class driver_sync#(ITEM_WIDTH, META_WIDTH);
     endtask
 endclass
 
-
 class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_driver#(sequence_item);
     `uvm_component_param_utils(uvm_dma_ll_rx::driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE))
 
     localparam PCIE_HDR_SIZE = 128;
     localparam DMA_HDR_SIZE  = 64;
     localparam PACKET_ALIGNMENT = 32;
-
 
     driver_sync#(ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) data_export;
 
@@ -77,7 +71,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         uvm_logic_vector_array::sequence_item#(ITEM_WIDTH)                      data;
         uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) meta;
     } pcie_info;
-
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -135,7 +128,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         return be;
     endfunction
 
-
     function logic [ITEM_WIDTH/8-1 : 0] lbe_to_fbe(logic [ITEM_WIDTH/8-1 : 0] lbe);
         logic [ITEM_WIDTH/8-1 : 0] fbe = 0;
 
@@ -152,7 +144,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
 
         return fbe;
     endfunction
-
 
     function string print_data(logic [ITEM_WIDTH-1 : 0] data[]);
         string ret = $sformatf("\nData size %0d", data.size());
@@ -241,7 +232,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         return ret;
     endfunction
 
-
     task send_data();
         pcie_info pcie_transactions[$];
         int unsigned packet_index;
@@ -259,9 +249,9 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         packet_index = 0;
         pcie_trans_cnt = 0;
         pcie_transactions.delete();
+
         //////////////////////////////////
         // DATA SEND
-
         while (packet_index < req.packet.size()) begin
             int unsigned data_index;
             logic [64-1 : 0] pcie_addr;
@@ -357,7 +347,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
             data_export.put(channel, pcie_transactions[it].meta, pcie_transactions[it].data);
         end
 
-
         //Allign pointer to PACKET ALLIGMENT
         if ((ptr.data_addr % PACKET_ALIGNMENT) != 0) begin
             const int unsigned size_to_allign = (PACKET_ALIGNMENT-(ptr.data_addr % PACKET_ALIGNMENT));
@@ -422,7 +411,6 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         ptr_write(m_regmodel.sw_hdr_pointer, ptr.hdr_addr);
     endtask
 
-
     task run_phase(uvm_phase phase);
         forever begin
             logic [16-1:0] packet_ptr;
@@ -449,4 +437,3 @@ class driver#(CHANNELS, PCIE_MTU, ITEM_WIDTH, DATA_ADDR_W, DEVICE) extends uvm_d
         end
     endtask
 endclass
-

@@ -10,8 +10,7 @@ class virt_seq#(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, CH
 
     localparam USER_META_WIDTH = 24 + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS);
 
-    uvm_reset::sequence_start                            m_reset;
-
+    uvm_reset::sequence_start                                                                                              m_reset;
     uvm_dma_ll::sequence_simple                                                                                            m_channel[CHANNELS];
     uvm_sequence#(uvm_mfb::sequence_item #(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, USER_META_WIDTH)) m_pcie;
     logic [CHANNELS-1:0] done;
@@ -70,10 +69,8 @@ class virt_seq#(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, CH
         end
     endtask
 
-
     task body();
         done = 0;
-
 
         fork
             run_reset();
@@ -87,6 +84,5 @@ class virt_seq#(USR_REGIONS, USR_REGION_SIZE, USR_BLOCK_SIZE, USR_ITEM_WIDTH, CH
         join_none
 
         wait((& done) == 1);
-
     endtask
 endclass
