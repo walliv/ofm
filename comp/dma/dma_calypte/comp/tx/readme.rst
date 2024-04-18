@@ -32,8 +32,52 @@ UVM Verification
 Verification Plan
 -----------------
 
-TODO:
+.. list-table:: Tab. 1
+    :align: center
+    :widths: 5 15 5 5 10 5
+    :header-rows: 1
 
+    * - ID
+      - Description
+      - Requirement level
+      - Checked by
+      - Status
+      - Test name
+    * - base
+      - Simple packet transfer and check if no packets are droped/damaged on an enabled channel. Randomly
+        enable/disable the channels and check the packet counters.
+      - Required
+      - Func. cover
+      - Verified
+      - test::base
+    * - mult_region
+      - For a multiple-regions configuration vary the packet begins/ends in all regions. This puts the
+        transaction buffer under stress test.
+      - Required
+      - Func. cover
+      - Unverified
+      - test::base/test::speed
+    * - pkt_drop
+      - Check if packets are droped on a disabled channel. Check if the counters of dropped packets have
+        correct values.
+      - Required
+      - Func. cover
+      - Unverified
+      - test::base
+    * - thrp_meas
+      - Measure throughput. Report on the end of the verification in Gbps and GBps. Write the measured values
+        to this file.
+      - Required
+      - None
+      - Unverified
+      - test::speed
+    * - lat_meas
+      - Measure latency from input to output. Report average value, maximum, minimum and standard deviation. Repeat
+        100000 times and report values in the documentation.
+      - Required
+      - None
+      - Unverified
+      - Special sequence that does measurement for a single packet.
 
 Coverage Measure
 ----------------
