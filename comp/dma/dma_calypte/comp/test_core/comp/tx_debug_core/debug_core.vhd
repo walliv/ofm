@@ -51,8 +51,8 @@ entity TX_DMA_DEBUG_CORE is
         -- RX MFB INTERFACE
         -- =======================================================================
         RX_MFB_META_PKT_SIZE : in std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
-        RX_MFB_META_CHAN     : in std_logic_vector(log2(CHANNELS) -1 downto 0);
         RX_MFB_META_HDR_META : in std_logic_vector(DMA_META_WIDTH -1 downto 0);
+        RX_MFB_META_CHAN     : in std_logic_vector(log2(CHANNELS) -1 downto 0);
 
         RX_MFB_DATA    : in  std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
         RX_MFB_SOF_POS : in  std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE))-1 downto 0);
@@ -65,8 +65,11 @@ entity TX_DMA_DEBUG_CORE is
         -- =======================================================================
         -- TX MFB INTERFACE
         -- =======================================================================
+        TX_MFB_META_PKT_SIZE : out std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
+        TX_MFB_META_HDR_META : out std_logic_vector(DMA_META_WIDTH -1 downto 0);
+        TX_MFB_META_CHAN     : out std_logic_vector(log2(CHANNELS) -1 downto 0);
+
         TX_MFB_DATA    : out std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH-1 downto 0);
-        TX_MFB_META    : out std_logic_vector(MFB_REGIONS*(DMA_META_WIDTH+log2(CHANNELS)+log2(PKT_SIZE_MAX+1))-1 downto 0);
         TX_MFB_SOF_POS : out std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE))-1 downto 0);
         TX_MFB_EOF_POS : out std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE*MFB_BLOCK_SIZE))-1 downto 0);
         TX_MFB_SOF     : out std_logic_vector(MFB_REGIONS-1 downto 0);
@@ -507,6 +510,12 @@ architecture FULL of TX_DMA_DEBUG_CORE is
     signal gen_mfb_dst_rdy : std_logic;
 
     -- =============================================================================================
+    -- Miscelaneous
+    -- =============================================================================================
+    -- signal to parse metainformation to the output from
+    signal tx_mfb_meta_mrg : std_logic_vector(log2(PKT_SIZE_MAX+1) + DMA_META_WIDTH + log2(CHANNELS) -1 downto 0);
+
+    -- =============================================================================================
     -- Debug signals
     -- =============================================================================================
     attribute mark_debug : string;
@@ -515,14 +524,11 @@ architecture FULL of TX_DMA_DEBUG_CORE is
     signal aux_sig_mfb_meta_pkt_size                  : std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
     signal aux_sig_mfb_meta_hdr_meta                  : std_logic_vector(DMA_META_WIDTH -1 downto 0);
 
-    signal tx_mfb_meta_chan_int                  : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal tx_mfb_meta_pkt_size                  : std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
-    signal tx_mfb_meta_hdr_meta                  : std_logic_vector(DMA_META_WIDTH -1 downto 0);
-    attribute mark_debug of tx_mfb_meta_chan_int : signal is "true";
-    attribute mark_debug of tx_mfb_meta_pkt_size : signal is "true";
-    attribute mark_debug of tx_mfb_meta_hdr_meta : signal is "true";
+    attribute mark_debug of TX_MFB_META_PKT_SIZE : signal is "true";
+    attribute mark_debug of TX_MFB_META_HDR_META : signal is "true";
+    attribute mark_debug of TX_MFB_META_CHAN     : signal is "true";
+
     attribute mark_debug of TX_MFB_DATA    : signal is "true";
-    attribute mark_debug of TX_MFB_META    : signal is "true";
     attribute mark_debug of TX_MFB_SOF     : signal is "true";
     attribute mark_debug of TX_MFB_EOF     : signal is "true";
     attribute mark_debug of TX_MFB_SOF_POS : signal is "true";
@@ -539,10 +545,6 @@ architecture FULL of TX_DMA_DEBUG_CORE is
     attribute mark_debug of meta_pattern_mismatch_cntr_incr  : signal is "true";
     attribute mark_debug of meta_pattern_copy_val  : signal is "true";
 begin
-
-    tx_mfb_meta_chan_int     <= TX_MFB_META(log2(CHANNELS) -1 downto 0);
-    tx_mfb_meta_hdr_meta     <= TX_MFB_META(log2(CHANNELS) + DMA_META_WIDTH-1 downto log2(CHANNELS));
-    tx_mfb_meta_pkt_size     <= TX_MFB_META(log2(PKT_SIZE_MAX+1) + log2(CHANNELS) + DMA_META_WIDTH-1 downto log2(CHANNELS) + DMA_META_WIDTH);
 
     assert (MI_WIDTH=32)
         report "ERROR: TX DMA Debug core: MI_WIDTH ("&to_string(MI_WIDTH)&") must be 32b!"
@@ -1272,11 +1274,15 @@ begin
             RX_MFB1_DST_RDY => gen_mfb_dst_rdy,
 
             TX_MFB_DATA     => TX_MFB_DATA,
-            TX_MFB_META     => TX_MFB_META,
+            TX_MFB_META     => tx_mfb_meta_mrg,
             TX_MFB_SOF      => TX_MFB_SOF,
             TX_MFB_SOF_POS  => TX_MFB_SOF_POS,
             TX_MFB_EOF      => TX_MFB_EOF,
             TX_MFB_EOF_POS  => TX_MFB_EOF_POS,
             TX_MFB_SRC_RDY  => TX_MFB_SRC_RDY,
             TX_MFB_DST_RDY  => TX_MFB_DST_RDY);
+
+    TX_MFB_META_PKT_SIZE <= tx_mfb_meta_mrg(log2(PKT_SIZE_MAX+1) + DMA_META_WIDTH + log2(CHANNELS) -1 downto DMA_META_WIDTH + log2(CHANNELS));
+    TX_MFB_META_HDR_META <= tx_mfb_meta_mrg(DMA_META_WIDTH + log2(CHANNELS) -1 downto log2(CHANNELS));
+    TX_MFB_META_CHAN     <= tx_mfb_meta_mrg(log2(CHANNELS) -1 downto 0);
 end architecture;
