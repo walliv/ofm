@@ -150,8 +150,11 @@ architecture FULL of DMA_TEST_CORE is
     -- =============================================================================================
     -- TX Debug Core ---> MFB Loopback
     -- =============================================================================================
+    signal tx_mfb_meta_pkt_size_dbg : std_logic_vector(log2(USR_TX_PKT_SIZE_MAX +1) -1 downto 0);
+    signal tx_mfb_meta_hdr_meta_dbg : std_logic_vector(HDR_META_WIDTH -1 downto 0);
+    signal tx_mfb_meta_chan_dbg     : std_logic_vector(log2(TX_CHANNELS) -1 downto 0);
+
     signal tx_mfb_data_dbg    : std_logic_vector(MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH -1 downto 0);
-    signal tx_mfb_meta_dbg    : std_logic_vector(log2(USR_TX_PKT_SIZE_MAX +1)+HDR_META_WIDTH+log2(TX_CHANNELS) -1 downto 0);
     signal tx_mfb_sof_dbg     : std_logic_vector(MFB_REGIONS -1 downto 0);
     signal tx_mfb_eof_dbg     : std_logic_vector(MFB_REGIONS -1 downto 0);
     signal tx_mfb_sof_pos_dbg : std_logic_vector(MFB_REGIONS*max(1, log2(MFB_REGION_SIZE)) -1 downto 0);
@@ -367,8 +370,8 @@ begin
                 ST_SP_DBG_META       => ST_SP_DBG_META,
 
                 RX_MFB_META_PKT_SIZE => TX_MFB_META_PKT_SIZE_IN,
-                RX_MFB_META_CHAN     => TX_MFB_META_CHAN_IN,
                 RX_MFB_META_HDR_META => TX_MFB_META_HDR_META_IN,
+                RX_MFB_META_CHAN     => TX_MFB_META_CHAN_IN,
 
                 RX_MFB_DATA          => TX_MFB_DATA_IN,
                 RX_MFB_SOF_POS       => TX_MFB_SOF_POS_IN,
@@ -378,8 +381,11 @@ begin
                 RX_MFB_SRC_RDY       => TX_MFB_SRC_RDY_IN,
                 RX_MFB_DST_RDY       => TX_MFB_DST_RDY_IN,
 
+                TX_MFB_META_PKT_SIZE => tx_mfb_meta_pkt_size_dbg,
+                TX_MFB_META_HDR_META => tx_mfb_meta_hdr_meta_dbg,
+                TX_MFB_META_CHAN     => tx_mfb_meta_chan_dbg,
+
                 TX_MFB_DATA          => tx_mfb_data_dbg,
-                TX_MFB_META          => tx_mfb_meta_dbg,
                 TX_MFB_SOF_POS       => tx_mfb_sof_pos_dbg,
                 TX_MFB_EOF_POS       => tx_mfb_eof_pos_dbg,
                 TX_MFB_SOF           => tx_mfb_sof_dbg,
@@ -404,8 +410,11 @@ begin
         mi_ardy_split(1) <= mi_rd_split(1) or mi_wr_split(1);
         mi_drdy_split(1) <= mi_rd_split(1);
 
+        tx_mfb_meta_pkt_size_dbg <= TX_MFB_META_PKT_SIZE_IN;
+        tx_mfb_meta_hdr_meta_dbg <= TX_MFB_META_HDR_META_IN;
+        tx_mfb_meta_chan_dbg     <= TX_MFB_META_CHAN_IN;
+
         tx_mfb_data_dbg    <= TX_MFB_DATA_IN;
-        tx_mfb_meta_dbg    <= TX_MFB_META_PKT_SIZE_IN & TX_MFB_META_HDR_META_IN & TX_MFB_META_CHAN_IN;
         tx_mfb_sof_dbg     <= TX_MFB_SOF_IN;
         tx_mfb_eof_dbg     <= TX_MFB_EOF_IN;
         tx_mfb_sof_pos_dbg <= TX_MFB_SOF_POS_IN;
@@ -468,7 +477,7 @@ begin
             TX_DST_RDY_OUT => TX_MFB_DST_RDY_OUT,
 
             TX_DATA_IN    => tx_mfb_data_dbg,
-            TX_META_IN    => tx_mfb_meta_dbg,
+            TX_META_IN    => tx_mfb_meta_pkt_size_dbg & tx_mfb_meta_hdr_meta_dbg & tx_mfb_meta_chan_dbg,
             TX_SOF_IN     => tx_mfb_sof_dbg,
             TX_EOF_IN     => tx_mfb_eof_dbg,
             TX_SOF_POS_IN => tx_mfb_sof_pos_dbg,
@@ -741,8 +750,11 @@ begin
                 RX_MFB_SRC_RDY       => rx_mfb_src_rdy_gen_mux,
                 RX_MFB_DST_RDY       => rx_mfb_dst_rdy_gen_mux,
 
+                TX_MFB_META_PKT_SIZE => RX_MFB_META_PKT_SIZE_OUT,
+                TX_MFB_META_HDR_META => RX_MFB_META_HDR_META_OUT,
+                TX_MFB_META_CHAN     => RX_MFB_META_CHAN_OUT,
+
                 TX_MFB_DATA          => RX_MFB_DATA_OUT,
-                TX_MFB_META          => rx_mfb_meta_dbg,
                 TX_MFB_SOF_POS       => RX_MFB_SOF_POS_OUT,
                 TX_MFB_EOF_POS       => RX_MFB_EOF_POS_OUT,
                 TX_MFB_SOF           => RX_MFB_SOF_OUT,
@@ -762,10 +774,6 @@ begin
                 MI_ARDY              => mi_ardy_split(4),
                 MI_DRDY              => mi_drdy_split(4)
                 );
-
-        RX_MFB_META_PKT_SIZE_OUT <= rx_mfb_meta_dbg(log2(USR_RX_PKT_SIZE_MAX+1) + HDR_META_WIDTH + log2(RX_CHANNELS) -1 downto HDR_META_WIDTH + log2(RX_CHANNELS));
-        RX_MFB_META_HDR_META_OUT <= rx_mfb_meta_dbg(HDR_META_WIDTH + log2(RX_CHANNELS) -1 downto log2(RX_CHANNELS));
-        RX_MFB_META_CHAN_OUT     <= rx_mfb_meta_dbg(log2(RX_CHANNELS) -1 downto 0);
     else generate
         mi_drd_split(4)  <= X"DEADBEAD";
         mi_ardy_split(4) <= mi_rd_split(4) or mi_wr_split(4);
