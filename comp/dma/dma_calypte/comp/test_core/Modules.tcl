@@ -8,7 +8,6 @@ lappend PACKAGES "$OFM_PATH/comp/base/pkg/type_pack.vhd"
 
 set MI_ASYNC_BASE              "$OFM_PATH/comp/mi_tools/async"
 set MI_SPLITTER_PLUS_GEN_BASE  "$OFM_PATH/comp/mi_tools/splitter_plus_gen"
-set MI_ASYNC_BASE              "$OFM_PATH/comp/mi_tools/async"
 set TX_DMA_DEBUG_CORE_BASE     "$ENTITY_BASE/comp/tx_debug_core"
 set MFB_LOOPBACK_BASE          "$OFM_PATH/comp/mfb_tools/flow/loopback"
 set DATA_LOGGER_BASE           "$OFM_PATH/comp/debug/data_logger"
