@@ -106,9 +106,6 @@ architecture BEHAV of MFB_GENERATOR is
     signal burst_fsm_pst : burst_fsm_state_t := S_TRIGGER_DETECT;
     signal burst_fsm_nst : burst_fsm_state_t := S_TRIGGER_DETECT;
 
-    signal ones_offs_high       : unsigned(log2(REGIONS) -1 downto 0);
-    signal ones_insert_en       : std_logic;
-
     signal my_burst_cntr_pst : unsigned(16 -1 downto 0);
     signal my_burst_cntr_nst : unsigned(16 -1 downto 0);
 
@@ -241,8 +238,7 @@ begin
         begin
             burst_fsm_nst     <= burst_fsm_pst;
             my_burst_cntr_nst <= my_burst_cntr_pst;
-            ones_insert_en    <= '0';
-            ones_offs_high    <= (others => '0');
+            gen_vld_regions   <= (others => '0');
 
             case burst_fsm_pst is
                 when S_TRIGGER_DETECT =>
@@ -253,13 +249,12 @@ begin
 
                         if (dst_rdy = '1') then
                             my_burst_cntr_nst <= burst_size - accepted_regions;
-                            ones_insert_en    <= '1';
                         end if;
 
                         if (burst_size > REGIONS) then
-                            ones_offs_high <= (others => '1');
+                            gen_vld_regions <= (others => '1');
                         else
-                            ones_offs_high <= resize(burst_size -1, log2(REGIONS));
+                            gen_vld_regions(to_integer(burst_size) -1 downto 0) <= (others => '1');
                         end if;
 
                         -- If burst is bigger then the number of regions, the generation needs to be
@@ -277,29 +272,19 @@ begin
 
                     if (dst_rdy = '1') then
                         my_burst_cntr_nst <= my_burst_cntr_pst - accepted_regions;
-                        ones_insert_en <= '1';
                     end if;
 
                     if (my_burst_cntr_pst > REGIONS) then
-                        ones_offs_high <= (others => '1');
+                        gen_vld_regions <= (others => '1');
                     else
                         if (accepted_regions = my_burst_cntr_pst) then
                             burst_fsm_nst <= S_TRIGGER_DETECT;
                         end if;
 
-                        ones_offs_high <= resize(my_burst_cntr_pst -1, log2(REGIONS));
+                        gen_vld_regions(to_integer(my_burst_cntr_pst) -1 downto 0) <= (others => '1');
                     end if;
             end case;
         end process;
-
-        ones_insertor_i : entity work.ONES_INSERTOR
-            generic map (
-                OFFSET_WIDTH => log2(REGIONS))
-            port map (
-                OFFSET_LOW  => (others => '0'),
-                OFFSET_HIGH => ones_offs_high,
-                VALID       => ones_insert_en,
-                ONES_VECTOR => gen_vld_regions);
     end generate;
 
     -- ======================================================================================
