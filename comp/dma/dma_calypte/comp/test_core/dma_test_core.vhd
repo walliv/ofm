@@ -467,15 +467,6 @@ begin
             RX_SRC_RDY_OUT => rx_mfb_src_rdy_lbk,
             RX_DST_RDY_OUT => rx_mfb_dst_rdy_lbk,
 
-            TX_DATA_OUT    => TX_MFB_DATA_OUT,
-            TX_META_OUT    => TX_MFB_META_OUT,
-            TX_SOF_OUT     => TX_MFB_SOF_OUT,
-            TX_EOF_OUT     => TX_MFB_EOF_OUT,
-            TX_SOF_POS_OUT => TX_MFB_SOF_POS_OUT,
-            TX_EOF_POS_OUT => TX_MFB_EOF_POS_OUT,
-            TX_SRC_RDY_OUT => TX_MFB_SRC_RDY_OUT,
-            TX_DST_RDY_OUT => TX_MFB_DST_RDY_OUT,
-
             TX_DATA_IN    => tx_mfb_data_dbg,
             TX_META_IN    => tx_mfb_meta_pkt_size_dbg & tx_mfb_meta_hdr_meta_dbg & tx_mfb_meta_chan_dbg,
             TX_SOF_IN     => tx_mfb_sof_dbg,
@@ -483,7 +474,16 @@ begin
             TX_SOF_POS_IN => tx_mfb_sof_pos_dbg,
             TX_EOF_POS_IN => tx_mfb_eof_pos_dbg,
             TX_SRC_RDY_IN => tx_mfb_src_rdy_dbg,
-            TX_DST_RDY_IN => tx_mfb_dst_rdy_dbg);
+            TX_DST_RDY_IN => tx_mfb_dst_rdy_dbg,
+
+            TX_DATA_OUT    => TX_MFB_DATA_OUT,
+            TX_META_OUT    => TX_MFB_META_OUT,
+            TX_SOF_OUT     => TX_MFB_SOF_OUT,
+            TX_EOF_OUT     => TX_MFB_EOF_OUT,
+            TX_SOF_POS_OUT => TX_MFB_SOF_POS_OUT,
+            TX_EOF_POS_OUT => TX_MFB_EOF_POS_OUT,
+            TX_SRC_RDY_OUT => TX_MFB_SRC_RDY_OUT,
+            TX_DST_RDY_OUT => TX_MFB_DST_RDY_OUT);
 
     -- =============================================================================================
     -- Latency measurement
