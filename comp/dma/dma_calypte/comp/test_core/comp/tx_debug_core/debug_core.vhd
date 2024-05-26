@@ -518,32 +518,32 @@ architecture FULL of TX_DMA_DEBUG_CORE is
     -- =============================================================================================
     -- Debug signals
     -- =============================================================================================
-    attribute mark_debug : string;
+    -- attribute mark_debug : string;
 
     signal aux_sig_mfb_meta_chan_int                  : std_logic_vector(log2(CHANNELS) -1 downto 0);
     signal aux_sig_mfb_meta_pkt_size                  : std_logic_vector(log2(PKT_SIZE_MAX+1) -1 downto 0);
     signal aux_sig_mfb_meta_hdr_meta                  : std_logic_vector(DMA_META_WIDTH -1 downto 0);
 
-    attribute mark_debug of TX_MFB_META_PKT_SIZE : signal is "true";
-    attribute mark_debug of TX_MFB_META_HDR_META : signal is "true";
-    attribute mark_debug of TX_MFB_META_CHAN     : signal is "true";
+    -- attribute mark_debug of TX_MFB_META_PKT_SIZE : signal is "true";
+    -- attribute mark_debug of TX_MFB_META_HDR_META : signal is "true";
+    -- attribute mark_debug of TX_MFB_META_CHAN     : signal is "true";
 
-    attribute mark_debug of TX_MFB_DATA    : signal is "true";
-    attribute mark_debug of TX_MFB_SOF     : signal is "true";
-    attribute mark_debug of TX_MFB_EOF     : signal is "true";
-    attribute mark_debug of TX_MFB_SOF_POS : signal is "true";
-    attribute mark_debug of TX_MFB_EOF_POS : signal is "true";
-    attribute mark_debug of TX_MFB_SRC_RDY : signal is "true";
-    attribute mark_debug of TX_MFB_DST_RDY : signal is "true";
+    -- attribute mark_debug of TX_MFB_DATA    : signal is "true";
+    -- attribute mark_debug of TX_MFB_SOF     : signal is "true";
+    -- attribute mark_debug of TX_MFB_EOF     : signal is "true";
+    -- attribute mark_debug of TX_MFB_SOF_POS : signal is "true";
+    -- attribute mark_debug of TX_MFB_EOF_POS : signal is "true";
+    -- attribute mark_debug of TX_MFB_SRC_RDY : signal is "true";
+    -- attribute mark_debug of TX_MFB_DST_RDY : signal is "true";
 
-    attribute mark_debug of pattern_comp_pst          : signal is "true";
-    attribute mark_debug of pattern_match_cntr_incr  : signal is "true";
-    attribute mark_debug of pattern_mismatch_cntr_incr  : signal is "true";
-    attribute mark_debug of pattern_copy_val  : signal is "true";
-    attribute mark_debug of meta_pattern_comp_pst          : signal is "true";
-    attribute mark_debug of meta_pattern_match_cntr_incr  : signal is "true";
-    attribute mark_debug of meta_pattern_mismatch_cntr_incr  : signal is "true";
-    attribute mark_debug of meta_pattern_copy_val  : signal is "true";
+    -- attribute mark_debug of pattern_comp_pst          : signal is "true";
+    -- attribute mark_debug of pattern_match_cntr_incr  : signal is "true";
+    -- attribute mark_debug of pattern_mismatch_cntr_incr  : signal is "true";
+    -- attribute mark_debug of pattern_copy_val  : signal is "true";
+    -- attribute mark_debug of meta_pattern_comp_pst          : signal is "true";
+    -- attribute mark_debug of meta_pattern_match_cntr_incr  : signal is "true";
+    -- attribute mark_debug of meta_pattern_mismatch_cntr_incr  : signal is "true";
+    -- attribute mark_debug of meta_pattern_copy_val  : signal is "true";
 begin
 
     assert (MI_WIDTH=32)
