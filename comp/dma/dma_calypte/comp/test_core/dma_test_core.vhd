@@ -255,25 +255,25 @@ architecture FULL of DMA_TEST_CORE is
     -- =============================================================================================
     -- Debug probes
     -- =============================================================================================
-    attribute mark_debug : string;
+    -- attribute mark_debug : string;
 
-    attribute mark_debug of data_logger_rst : signal is "true";
-    attribute mark_debug of tst_gen_mux_sel : signal is "true";
-    attribute mark_debug of meas_fsm_pst    : signal is "true";
-    attribute mark_debug of pkt_cnt_pst     : signal is "true";
-    attribute mark_debug of test_finished   : signal is "true";
+    -- attribute mark_debug of data_logger_rst : signal is "true";
+    -- attribute mark_debug of tst_gen_mux_sel : signal is "true";
+    -- attribute mark_debug of meas_fsm_pst    : signal is "true";
+    -- attribute mark_debug of pkt_cnt_pst     : signal is "true";
+    -- attribute mark_debug of test_finished   : signal is "true";
 
-    attribute mark_debug of mfb_gen_ctrl_pkt_cnt_clr : signal is "true";
-    attribute mark_debug of mfb_gen_ctrl_length      : signal is "true";
-    attribute mark_debug of mfb_gen_ctrl_chan_val    : signal is "true";
-    attribute mark_debug of mfb_gen_ctrl_chan_inc    : signal is "true";
-    attribute mark_debug of mfb_gen_ctrl_en          : signal is "true";
-    attribute mark_debug of mfb_gen_ctrl_pkt_cnt     : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_pkt_cnt_clr : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_length      : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_chan_val    : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_chan_inc    : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_en          : signal is "true";
+    -- attribute mark_debug of mfb_gen_ctrl_pkt_cnt     : signal is "true";
 
-    attribute mark_debug of lat_meas_val        : signal is "true";
-    attribute mark_debug of lat_meas_val_vld    : signal is "true";
-    attribute mark_debug of lat_meas_fifo_full  : signal is "true";
-    attribute mark_debug of lat_meas_fifo_items : signal is "true";
+    -- attribute mark_debug of lat_meas_val        : signal is "true";
+    -- attribute mark_debug of lat_meas_val_vld    : signal is "true";
+    -- attribute mark_debug of lat_meas_fifo_full  : signal is "true";
+    -- attribute mark_debug of lat_meas_fifo_items : signal is "true";
 begin
     mi_async_i : entity work.MI_ASYNC
         generic map(
