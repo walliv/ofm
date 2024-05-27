@@ -35,7 +35,7 @@ entity DMA_TEST_CORE is
         TX_DMA_DBG_CORE_EN : boolean := TRUE;
         RX_DMA_DBG_CORE_EN : boolean := TRUE;
 
-        ST_SP_DBG_SIGNAL_W : natural := 2;
+        ST_SP_DBG_SIGNAL_W : natural := 4;
         -- Width of MI bus
         MI_WIDTH           : natural := 32
         );
@@ -696,6 +696,8 @@ begin
         rx_mfb_dst_rdy_gen <= rx_mfb_dst_rdy_gen_mux when tst_gen_mux_sel = '1' else '1';
 
     else generate
+        data_logger_ctrlo <= (others => '0');
+
         mi_drd_split(2)  <= X"DEAD_BEAD";
         mi_ardy_split(2) <= mi_rd_split(2) or mi_wr_split(2);
         mi_drdy_split(2) <= mi_rd_split(2);
