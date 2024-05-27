@@ -524,6 +524,8 @@ proc SynthesizeProject {synth_flags hierarchy} {
         nb_main
     }
 
+    set_param messaging.defaultLimit 3000
+
     puts "Using FPGA part: $SYNTH_FLAGS(FPGA)"
     set_part $SYNTH_FLAGS(FPGA)
 
