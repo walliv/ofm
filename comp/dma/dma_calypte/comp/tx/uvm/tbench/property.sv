@@ -39,10 +39,10 @@ module TX_DMA_CALYPTE_PROPERTY #(
     end
 
     mfb_property #(
-        .REGIONS     (PCIE_CQ_MFB_REGIONS                  ),
-        .REGION_SIZE (PCIE_CQ_MFB_REGION_SIZE              ),
-        .BLOCK_SIZE  (PCIE_CQ_MFB_BLOCK_SIZE               ),
-        .ITEM_WIDTH  (PCIE_CQ_MFB_ITEM_WIDTH               ),
+        .REGIONS     (PCIE_CQ_MFB_REGIONS),
+        .REGION_SIZE (PCIE_CQ_MFB_REGION_SIZE),
+        .BLOCK_SIZE  (PCIE_CQ_MFB_BLOCK_SIZE),
+        .ITEM_WIDTH  (PCIE_CQ_MFB_ITEM_WIDTH),
         .META_WIDTH  (sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)
     ) cq_mfb_property_i (
         .RESET (RESET),
@@ -50,11 +50,11 @@ module TX_DMA_CALYPTE_PROPERTY #(
     );
 
     mfb_property #(
-        .REGIONS     (USR_TX_MFB_REGIONS    ),
+        .REGIONS     (USR_TX_MFB_REGIONS),
         .REGION_SIZE (USR_TX_MFB_REGION_SIZE),
-        .BLOCK_SIZE  (USR_TX_MFB_BLOCK_SIZE ),
-        .ITEM_WIDTH  (USR_TX_MFB_ITEM_WIDTH ),
-        .META_WIDTH  (USR_MFB_META_WIDTH    )
+        .BLOCK_SIZE  (USR_TX_MFB_BLOCK_SIZE),
+        .ITEM_WIDTH  (USR_TX_MFB_ITEM_WIDTH),
+        .META_WIDTH  (USR_MFB_META_WIDTH)
     ) usr_tx_mfb_property_i (
         .RESET (RESET),
         .vif   (usr_tx_mfb)
