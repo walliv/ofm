@@ -71,11 +71,11 @@ module testbench;
         .USR_TX_MFB_REGION_SIZE  (USR_TX_MFB_REGION_SIZE),
         .USR_TX_MFB_BLOCK_SIZE   (USR_TX_MFB_BLOCK_SIZE),
         .USR_TX_MFB_ITEM_WIDTH   (USR_TX_MFB_ITEM_WIDTH),
-        .USR_MFB_META_WIDTH      (USR_MFB_META_WIDTH),
         .PCIE_CQ_MFB_REGIONS     (PCIE_CQ_MFB_REGIONS),
         .PCIE_CQ_MFB_REGION_SIZE (PCIE_CQ_MFB_REGION_SIZE),
         .PCIE_CQ_MFB_BLOCK_SIZE  (PCIE_CQ_MFB_BLOCK_SIZE),
-        .PCIE_CQ_MFB_ITEM_WIDTH  (PCIE_CQ_MFB_ITEM_WIDTH)
+        .PCIE_CQ_MFB_ITEM_WIDTH  (PCIE_CQ_MFB_ITEM_WIDTH),
+        .USR_MFB_META_WIDTH      (USR_MFB_META_WIDTH)
     ) tx_dma_calypte_property_i (
         .RESET                   (reset_vif.RESET),
         .mfb_rx                  (cq_mfb_vif),
