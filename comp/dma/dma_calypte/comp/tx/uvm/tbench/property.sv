@@ -14,7 +14,7 @@ module DMA_LL_PROPERTY #(
     USR_TX_MFB_BLOCK_SIZE,
     USR_TX_MFB_ITEM_WIDTH,
 
-    USR_META_WIDTH,
+    USR_MFB_META_WIDTH,
 
     PCIE_CQ_MFB_REGIONS,
     PCIE_CQ_MFB_REGION_SIZE,
@@ -54,7 +54,7 @@ module DMA_LL_PROPERTY #(
         .REGION_SIZE (USR_TX_MFB_REGION_SIZE),
         .BLOCK_SIZE  (USR_TX_MFB_BLOCK_SIZE ),
         .ITEM_WIDTH  (USR_TX_MFB_ITEM_WIDTH ),
-        .META_WIDTH  (USR_META_WIDTH        )
+        .META_WIDTH  (USR_MFB_META_WIDTH    )
     ) usr_tx_mfb_property_i (
         .RESET (RESET),
         .vif   (usr_tx_mfb)
