@@ -8,7 +8,7 @@
 import uvm_pkg::*;
 `include "uvm_macros.svh"
 
-module DMA_LL_PROPERTY #(
+module TX_DMA_CALYPTE_PROPERTY #(
     USR_TX_MFB_REGIONS,
     USR_TX_MFB_REGION_SIZE,
     USR_TX_MFB_BLOCK_SIZE,
