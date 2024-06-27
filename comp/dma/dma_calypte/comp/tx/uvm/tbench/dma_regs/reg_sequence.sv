@@ -76,5 +76,3 @@ class stop_channel_seq extends uvm_sequence;
         end while ((data & 32'h1) != 0);
     endtask
 endclass
-
-
