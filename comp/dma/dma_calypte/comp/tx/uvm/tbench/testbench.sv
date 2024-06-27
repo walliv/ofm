@@ -26,7 +26,7 @@ module testbench;
     reset_if                                                                                                                                      reset_vif        (CLK);
     mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)                        usr_tx_mfb_vif   (CLK);
     mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) cq_mfb_vif       (CLK);
-    mvb_if #(PCIE_CQ_MFB_REGIONS, 1)                                                                                                              usr_meta_mvb_vif (CLK);
+    mvb_if #(PCIE_CQ_MFB_REGIONS, 1)                                                                                                              internal_meta_mfb_vif (CLK);
     mi_if  #(MI_WIDTH, MI_WIDTH)                                                                                                                  config_mi_vif    (CLK);
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -43,7 +43,7 @@ module testbench;
         uvm_config_db#(virtual mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::set(null, "", "cq_mfb_vif",       cq_mfb_vif);
         uvm_config_db#(virtual mi_if  #(MI_WIDTH, MI_WIDTH))                                                                                                                 ::set(null, "", "config_mi_vif",    config_mi_vif);
         uvm_config_db#(virtual mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH))                       ::set(null, "", "usr_tx_mfb_vif",   usr_tx_mfb_vif);
-        uvm_config_db#(virtual mvb_if #(PCIE_CQ_MFB_REGIONS, 1))                                                                                                             ::set(null, "", "usr_meta_mvb_vif", usr_meta_mvb_vif);
+        uvm_config_db#(virtual mvb_if #(PCIE_CQ_MFB_REGIONS, 1))                                                                                                             ::set(null, "", "internal_meta_mfb_vif", internal_meta_mfb_vif);
 
         m_root = uvm_root::get();
         m_root.finish_on_completion = 0;
@@ -84,8 +84,8 @@ module testbench;
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // GRAY BOX CONNECTION
-    assign usr_meta_mvb_vif.DATA    = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.pkt_drop_en;
-    assign usr_meta_mvb_vif.VLD     = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_SOF;
-    assign usr_meta_mvb_vif.SRC_RDY = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_SRC_RDY;
-    assign usr_meta_mvb_vif.DST_RDY = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_DST_RDY;
+    assign internal_meta_mfb_vif.DATA    = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.pkt_drop_en;
+    assign internal_meta_mfb_vif.VLD     = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_SOF;
+    assign internal_meta_mfb_vif.SRC_RDY = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_SRC_RDY;
+    assign internal_meta_mfb_vif.DST_RDY = DUT_U.VHDL_DUT_U.tx_dma_chan_start_stop_ctrl_i.PCIE_MFB_DST_RDY;
 endmodule
