@@ -60,6 +60,11 @@ SETTINGS = {
         "PCIE_LEN_MIN"            : "128",
         "PCIE_LEN_MAX"            : "256",
     },
+    "2_regions" : {
+        "USER_TX_MFB_REGION_SIZE" : "8",
+        "PCIE_CQ_MFB_REGIONS"     : "2",
+        "PCIE_CC_MFB_REGIONS"     : "2",
+    },
     "_combinations_" : (
     # (                                                                  ), # default
     # (             "4_channels",                                        ),
