@@ -7,13 +7,13 @@
 
 import test::*;
 
-module DUT(
-        input logic     CLK,
-        input logic     RST,
-        mfb_if.dut_rx   cq_mfb,
-        mfb_if.dut_tx   usr_tx_mfb,
-        mi_if.dut_slave config_mi
-    );
+module DUT (
+    input logic     CLK,
+    input logic     RST,
+    mfb_if.dut_rx   cq_mfb,
+    mfb_if.dut_tx   usr_tx_mfb,
+    mi_if.dut_slave config_mi
+);
 
     localparam USR_SOF_POS_WIDTH = (($clog2(USR_TX_MFB_REGION_SIZE)*USR_TX_MFB_REGIONS) == 0) ? (USR_TX_MFB_REGIONS) : (USR_TX_MFB_REGIONS*$clog2(USR_TX_MFB_REGION_SIZE));
     localparam USR_EOF_POS_WIDTH = USR_TX_MFB_REGIONS*$clog2(USR_TX_MFB_REGION_SIZE*USR_TX_MFB_BLOCK_SIZE);
