@@ -6,12 +6,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 class control_register extends uvm_reg;
-    `uvm_object_utils(uvm_dma_regs::control_register)
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::control_register)
 
     // Write
     rand uvm_reg_field dma_enable;
 
-    function new(string name = "reg_status");
+    function new(string name = "control_register");
         super.new(name, 1, UVM_NO_COVERAGE);
     endfunction
 
@@ -33,12 +33,12 @@ class control_register extends uvm_reg;
 endclass
 
 class status_register extends uvm_reg;
-    `uvm_object_utils(uvm_dma_regs::status_register)
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::status_register)
 
     // Write
     rand uvm_reg_field dma_status;
 
-    function new(string name = "reg_status");
+    function new(string name = "status_register");
         super.new(name, 1, UVM_NO_COVERAGE);
     endfunction
 
@@ -60,7 +60,7 @@ class status_register extends uvm_reg;
 endclass
 
 class pointer_register extends uvm_reg;
-    `uvm_object_utils(uvm_dma_regs::pointer_register)
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::pointer_register)
 
     // Write
     rand uvm_reg_field pointer;
@@ -87,12 +87,12 @@ class pointer_register extends uvm_reg;
 endclass
 
 class cnt_register extends uvm_reg;
-    `uvm_object_utils(uvm_dma_regs::cnt_register)
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::cnt_register)
 
     // Write
     rand uvm_reg_field cnt;
 
-    function new(string name = "cnt");
+    function new(string name = "cnt_register");
         super.new(name, 64, UVM_NO_COVERAGE);
     endfunction
 
@@ -112,6 +112,3 @@ class cnt_register extends uvm_reg;
                       );
     endfunction
 endclass
-
-
-
