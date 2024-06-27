@@ -33,31 +33,31 @@ module DUT(
     assign cq_mfb_sof_int = '0;
 
     TX_DMA_CALYPTE #(
-        .DEVICE                  (DEVICE),
+        .DEVICE                   (DEVICE),
 
-        .MI_WIDTH                (MI_WIDTH),
+        .MI_WIDTH                 (MI_WIDTH),
 
-        .USR_TX_MFB_REGIONS     (USR_TX_MFB_REGIONS),
-        .USR_TX_MFB_REGION_SIZE (USR_TX_MFB_REGION_SIZE),
-        .USR_TX_MFB_BLOCK_SIZE  (USR_TX_MFB_BLOCK_SIZE),
-        .USR_TX_MFB_ITEM_WIDTH  (USR_TX_MFB_ITEM_WIDTH),
+        .USR_TX_MFB_REGIONS       (USR_TX_MFB_REGIONS),
+        .USR_TX_MFB_REGION_SIZE   (USR_TX_MFB_REGION_SIZE),
+        .USR_TX_MFB_BLOCK_SIZE    (USR_TX_MFB_BLOCK_SIZE),
+        .USR_TX_MFB_ITEM_WIDTH    (USR_TX_MFB_ITEM_WIDTH),
 
-        .PCIE_CQ_MFB_REGIONS     (PCIE_CQ_MFB_REGIONS),
-        .PCIE_CQ_MFB_REGION_SIZE (PCIE_CQ_MFB_REGION_SIZE),
-        .PCIE_CQ_MFB_BLOCK_SIZE  (PCIE_CQ_MFB_BLOCK_SIZE),
-        .PCIE_CQ_MFB_ITEM_WIDTH  (PCIE_CQ_MFB_ITEM_WIDTH),
+        .PCIE_CQ_MFB_REGIONS      (PCIE_CQ_MFB_REGIONS),
+        .PCIE_CQ_MFB_REGION_SIZE  (PCIE_CQ_MFB_REGION_SIZE),
+        .PCIE_CQ_MFB_BLOCK_SIZE   (PCIE_CQ_MFB_BLOCK_SIZE),
+        .PCIE_CQ_MFB_ITEM_WIDTH   (PCIE_CQ_MFB_ITEM_WIDTH),
 
-        .PCIE_CC_MFB_REGIONS     (PCIE_CC_MFB_REGIONS),
-        .PCIE_CC_MFB_REGION_SIZE (PCIE_CC_MFB_REGION_SIZE),
-        .PCIE_CC_MFB_BLOCK_SIZE  (PCIE_CC_MFB_BLOCK_SIZE),
-        .PCIE_CC_MFB_ITEM_WIDTH  (PCIE_CC_MFB_ITEM_WIDTH),
+        .PCIE_CC_MFB_REGIONS      (PCIE_CC_MFB_REGIONS),
+        .PCIE_CC_MFB_REGION_SIZE  (PCIE_CC_MFB_REGION_SIZE),
+        .PCIE_CC_MFB_BLOCK_SIZE   (PCIE_CC_MFB_BLOCK_SIZE),
+        .PCIE_CC_MFB_ITEM_WIDTH   (PCIE_CC_MFB_ITEM_WIDTH),
 
-        .DMA_HDR_POINTER_WIDTH   (DMA_HDR_POINTER_WIDTH),
-        .DATA_POINTER_WIDTH      (DATA_POINTER_WIDTH),
-        .CHANNELS                (CHANNELS),
-        .CNTRS_WIDTH             (CNTRS_WIDTH),
-        .HDR_META_WIDTH          (HDR_META_WIDTH),
-        .PKT_SIZE_MAX            (PKT_SIZE_MAX)
+        .DMA_HDR_POINTER_WIDTH    (DMA_HDR_POINTER_WIDTH),
+        .DATA_POINTER_WIDTH       (DATA_POINTER_WIDTH),
+        .CHANNELS                 (CHANNELS),
+        .CNTRS_WIDTH              (CNTRS_WIDTH),
+        .HDR_META_WIDTH           (HDR_META_WIDTH),
+        .PKT_SIZE_MAX             (PKT_SIZE_MAX)
     ) VHDL_DUT_U (
         .CLK                      (CLK),
         .RESET                    (RST),
@@ -92,8 +92,8 @@ module DUT(
         .PCIE_CQ_MFB_SRC_RDY      (cq_mfb.SRC_RDY),
         .PCIE_CQ_MFB_DST_RDY      (cq_mfb.DST_RDY),
 
-        .ST_SP_DBG_CHAN(),
-        .ST_SP_DBG_META(),
+        .ST_SP_DBG_CHAN           (),
+        .ST_SP_DBG_META           (),
 
         .PCIE_CC_MFB_DATA         (),
         .PCIE_CC_MFB_META         (),
