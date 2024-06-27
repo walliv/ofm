@@ -8,8 +8,25 @@
 class base extends uvm_test;
     typedef uvm_component_registry#(test::base, "test::base") type_id;
 
-    uvm_dma_ll::env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, PCIE_CQ_MFB_REGIONS,
-                      PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_LEN_MAX, CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_POINTER_WIDTH) m_env;
+    uvm_tx_dma_calypte::env #(
+        DEVICE,
+        MI_WIDTH,
+
+        USR_TX_MFB_REGIONS,
+        USR_TX_MFB_REGION_SIZE,
+        USR_TX_MFB_BLOCK_SIZE,
+        USR_TX_MFB_ITEM_WIDTH,
+
+        PCIE_CQ_MFB_REGIONS,
+        PCIE_CQ_MFB_REGION_SIZE,
+        PCIE_CQ_MFB_BLOCK_SIZE,
+        PCIE_CQ_MFB_ITEM_WIDTH,
+
+        CHANNELS,
+        DATA_POINTER_WIDTH,
+        PKT_SIZE_MAX,
+        PCIE_LEN_MAX
+    ) m_env;
 
     uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
@@ -32,27 +49,29 @@ class base extends uvm_test;
     endfunction
 
     function void build_phase(uvm_phase phase);
-        m_env = uvm_dma_ll::env #(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH, PCIE_CQ_MFB_REGIONS,
-                                  PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, PCIE_LEN_MAX, CHANNELS, PKT_SIZE_MAX, MI_WIDTH, DEVICE, DATA_POINTER_WIDTH)::type_id::create("m_env", this);
+        m_env = uvm_dma_ll::env #(DEVICE, MI_WIDTH,
+                                  USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH,
+                                  PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH,
+                                  CHANNELS, DATA_POINTER_WIDTH, PKT_SIZE_MAX, PCIE_LEN_MAX )::type_id::create("m_env", this);
     endfunction
 
     // ------------------------------------------------------------------------
     // Create environment and Run sequences o their sequencers
     virtual task run_phase(uvm_phase phase);
         time time_start;
-        virt_seq#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
-                  CHANNELS, PKT_SIZE_MAX) m_vseq;
+        virt_seq #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH,
+                   CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX) m_virt_seq;
 
         //CREATE SEQUENCES
-        m_vseq = virt_seq#(USER_TX_MFB_REGIONS, USER_TX_MFB_REGION_SIZE, USER_TX_MFB_BLOCK_SIZE, USER_TX_MFB_ITEM_WIDTH,
-                           CHANNELS, PKT_SIZE_MAX)::type_id::create("m_vseq");
+        m_virt_seq = virt_seq #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH,
+                                CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX)::type_id::create("m_virt_seq");
 
         //RISE OBJECTION
         phase.raise_objection(this);
 
-        m_vseq.init();
-        m_vseq.randomize();
-        m_vseq.start(m_env.m_sequencer);
+        m_virt_seq.init();
+        m_virt_seq.randomize();
+        m_virt_seq.start(m_env.m_sequencer);
 
         time_start = $time();
         while((time_start + 500us) > $time() && m_env.sc.used()) begin
