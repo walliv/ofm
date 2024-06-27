@@ -6,12 +6,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 
-class start_channel extends uvm_sequence;
-    `uvm_object_utils(uvm_dma_regs::start_channel)
+class start_channel_seq extends uvm_sequence;
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::start_channel_seq)
 
-    reg_channel m_regmodel;
+    regmodel_channel m_regmodel_channel;
 
-    function new (string name = "start_channel");
+    function new (string name = "start_channel_seq");
         super.new(name);
     endfunction
 
@@ -22,24 +22,25 @@ class start_channel extends uvm_sequence;
 
         //Randomize sequence of doing this
         //write sw_pointers
-        m_regmodel.sw_data_pointer.write(status, 'h0, .parent(this));
-        m_regmodel.sw_hdr_pointer.write(status,  'h0, .parent(this));
+        m_regmodel_channel.sw_data_pointer_reg.write(status, 'h0, .parent(this));
+        m_regmodel_channel.sw_hdr_pointer_reg .write(status, 'h0, .parent(this));
 
         //startup channel
-        m_regmodel.control.write(status,  32'h1,  .parent(this));
+        m_regmodel_channel.control_reg.write(status,  32'h1,  .parent(this));
+
         do begin
             #(300ns)
-            m_regmodel.status.read(status, data, .parent(this));
+            m_regmodel_channel.status_reg.read(status, data, .parent(this));
         end while ((data & 32'h1) != 1);
     endtask
 endclass
 
-class stop_channel extends uvm_sequence;
-    `uvm_object_utils(uvm_dma_regs::stop_channel)
+class stop_channel_seq extends uvm_sequence;
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::stop_channel_seq)
 
-    reg_channel m_regmodel;
+    regmodel_channel m_regmodel_channel;
 
-    function new (string name = "start_channel");
+    function new (string name = "start_channel_seq");
         super.new(name);
     endfunction
 
@@ -54,24 +55,24 @@ class stop_channel extends uvm_sequence;
         int unsigned hw_hdr;
 
         do begin
-            m_regmodel.sw_data_pointer.read(status, data, .parent(this));
+            m_regmodel_channel.sw_data_pointer_reg.read(status, data, .parent(this));
             sw_data = data;
-            m_regmodel.sw_hdr_pointer.read(status, data, .parent(this));
+            m_regmodel_channel.sw_hdr_pointer_reg .read(status, data, .parent(this));
             sw_hdr = data;
-            m_regmodel.hw_data_pointer.read(status, data, .parent(this));
+            m_regmodel_channel.hw_data_pointer_reg.read(status, data, .parent(this));
             hw_data = data;
-            m_regmodel.hw_hdr_pointer.read(status, data, .parent(this));
+            m_regmodel_channel.hw_hdr_pointer_reg .read(status, data, .parent(this));
             hw_hdr = data;
 
             #(200ns);
         end while (sw_data != hw_data || sw_hdr != hw_hdr);
 
         //startup channel
-        m_regmodel.control.write(status,  32'h0,  .parent(this));
+        m_regmodel_channel.control_reg.write(status,  32'h0,  .parent(this));
+
         do begin
             #(300ns)
-            m_regmodel.status.read(status, data, .parent(this));
-
+            m_regmodel_channel.status_reg.read(status, data, .parent(this));
         end while ((data & 32'h1) != 0);
     endtask
 endclass
