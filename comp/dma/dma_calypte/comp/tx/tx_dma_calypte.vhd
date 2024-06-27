@@ -1,6 +1,5 @@
--- tx_dma_calypte.vhd: connecting all important parts of the TX DMA Calypte and adds small logic to
--- connections when necessary
--- Copyright (C) 2023 CESNET z.s.p.o.
+-- tx_dma_calypte.vhd: Transmitting controller (Host-to-FPGA) of the DMA Calypte engine
+-- Copyright (C) 2023-2024 CESNET z.s.p.o.
 -- Author(s): Vladislav Valek  <xvalek14@vutbr.cz>
 --
 -- SPDX-License-Identifier: BSD-3-Clause
