@@ -20,6 +20,7 @@ module DUT(
     logic [$clog2(PKT_SIZE_MAX+1)-1:0] packet_size;
     logic [$clog2(CHANNELS)-1:0]       channel;
     logic [24-1:0]                     meta;
+    logic [PCIE_CQ_MFB_REGIONS -1 : 0] cq_mfb_sof_int;
 
     generate
         //{packet_size, channel, meta} 24 + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS)[CHANNELS]
@@ -27,6 +28,8 @@ module DUT(
         assign mfb_tx.META[24 + $clog2(CHANNELS)-1                          -: $clog2(CHANNELS)]       = channel[$clog2(CHANNELS)-1 -: $clog2(CHANNELS)]                ;
         assign mfb_tx.META[24 - 1                                           -: 24]                     = meta[24-1 -: 24]                                               ;
     endgenerate
+
+    assign cq_mfb_sof_int = '0;
 
     TX_DMA_CALYPTE #(
         .DEVICE                  (DEVICE),
@@ -81,12 +84,12 @@ module DUT(
 
         .PCIE_CQ_MFB_DATA          (mfb_rx.DATA),
         .PCIE_CQ_MFB_META          (mfb_rx.META),
-        // .PCIE_CQ_MFB_SOF_POS       ('0),//mfb_rx.SOF_POS),
         .PCIE_CQ_MFB_EOF_POS       (mfb_rx.EOF_POS),
         .PCIE_CQ_MFB_SOF           (mfb_rx.SOF),
         .PCIE_CQ_MFB_EOF           (mfb_rx.EOF),
         .PCIE_CQ_MFB_SRC_RDY       (mfb_rx.SRC_RDY),
         .PCIE_CQ_MFB_DST_RDY       (mfb_rx.DST_RDY),
+        .PCIE_CQ_MFB_SOF_POS      (cq_mfb_sof_int),
 
         .ST_SP_DBG_CHAN(),
         .ST_SP_DBG_META(),
