@@ -30,8 +30,8 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
     uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)))                m_cq_data_analysis_fifo;
     uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector      ::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))) m_cq_meta_analysis_fifo;
-    uvm_analysis_port     #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)))                    m_usr_tx_data_analysis_port;
-    uvm_analysis_port     #(uvm_common::model_item #(uvm_logic_vector      ::sequence_item #(USR_MFB_META_WIDTH)))                    m_usr_tx_meta_analysis_port;
+    uvm_analysis_port     #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)))                    m_usr_data_analysis_port;
+    uvm_analysis_port     #(uvm_common::model_item #(uvm_logic_vector      ::sequence_item #(USR_MFB_META_WIDTH)))                    m_usr_meta_analysis_port;
 
     local uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS) m_regmodel_top;
 
@@ -55,10 +55,10 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
     function new (string name, uvm_component parent = null);
         super.new(name, parent);
-        m_cq_data_analysis_fifo     = new("m_cq_data_analysis_fifo",     this);
-        m_cq_meta_analysis_fifo     = new("m_cq_meta_analysis_fifo",     this);
-        m_usr_tx_data_analysis_port = new("m_usr_tx_data_analysis_port", this);
-        m_usr_tx_meta_analysis_port = new("m_usr_tx_meta_analysis_port", this);
+        m_cq_data_analysis_fifo  = new("m_cq_data_analysis_fifo",  this);
+        m_cq_meta_analysis_fifo  = new("m_cq_meta_analysis_fifo",  this);
+        m_usr_data_analysis_port = new("m_usr_data_analysis_port", this);
+        m_usr_meta_analysis_port = new("m_usr_meta_analysis_port", this);
 
         m_pcie_transactions = 0;
         m_dma_transactions  = 0;
@@ -71,8 +71,8 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
         end
     endfunction
 
-    function void regmodel_set(uvm_tx_dma_calypte_regs::regmodel #(CHANNELS) m_regmodel);
-        this.m_regmodel_top = m_regmodel;
+    function void regmodel_set(uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS) regmodel);
+        this.m_regmodel_top = regmodel;
     endfunction
 
     function void time_add (int unsigned channel, time inf_time[string], int unsigned id);
@@ -244,8 +244,8 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
                     debug_msg = {debug_msg, $sformatf("================================================================================= \n")};
                     `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH)
 
-                    m_usr_tx_data_analysis_port.write(usr_tx_data_tr);
-                    m_usr_tx_meta_analysis_port.write(usr_tx_meta_tr);
+                    m_usr_data_analysis_port.write(usr_tx_data_tr);
+                    m_usr_meta_analysis_port.write(usr_tx_meta_tr);
                 end else begin
                     m_drop_transactions++;
 
