@@ -23,11 +23,13 @@ module testbench;
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // Interfaces
-    reset_if                                                                                                                                      reset_vif        (CLK);
-    mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)                        usr_tx_mfb_vif   (CLK);
-    mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) cq_mfb_vif       (CLK);
+    reset_if                                                                                                                                      reset_vif             (CLK);
+    mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)                        usr_tx_mfb_vif        (CLK);
+    mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) cq_mfb_vif            (CLK);
+    // This is a bit confusing that the mvb interface is callled mfb in its name but that is because the
+    // internal metainformation are transported as MFB metadata.
     mvb_if #(PCIE_CQ_MFB_REGIONS, 1)                                                                                                              internal_meta_mfb_vif (CLK);
-    mi_if  #(MI_WIDTH, MI_WIDTH)                                                                                                                  config_mi_vif    (CLK);
+    mi_if  #(MI_WIDTH, MI_WIDTH)                                                                                                                  config_mi_vif         (CLK);
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // Define clock period
