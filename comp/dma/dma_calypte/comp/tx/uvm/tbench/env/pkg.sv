@@ -5,8 +5,8 @@
 
 // SPDX-License-Identifier: BSD-3-Clause
 
-`ifndef LL_DMA_ENV_SV
-`define LL_DMA_ENV_SV
+`ifndef TX_DMA_CALYPTE_ENV_SV
+`define TX_DMA_CALYPTE_ENV_SV
 
 package uvm_dma_ll;
 
