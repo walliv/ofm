@@ -5,8 +5,8 @@
 
 // SPDX-License-Identifier: BSD-3-Clause
 
-class base_send_sequence#(type T_ITEM) extends uvm_sequence #(T_ITEM);
-    `uvm_object_param_utils(uvm_dma_ll_rx::base_send_sequence#(T_ITEM))
+class base_send_sequence #(type T_ITEM) extends uvm_sequence #(T_ITEM);
+    `uvm_object_param_utils(uvm_tx_dma_calypte_cq::base_send_sequence #(T_ITEM))
 
     mailbox#(T_ITEM) tr_export;
 
