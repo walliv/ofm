@@ -5,35 +5,35 @@
 
 // SPDX-License-Identifier: BSD-3-Clause
 
-class sequence_simple extends uvm_sequence#(uvm_dma_ll_rx::sequence_item);
-    `uvm_object_param_utils(uvm_dma_ll::sequence_simple)
-    `uvm_declare_p_sequencer(uvm_dma_ll_rx::sequencer)
+class sequence_simple extends uvm_sequence#(uvm_tx_dma_calypte_cq::sequence_item);
+    `uvm_object_param_utils(uvm_tx_dma_calypte::sequence_simple)
+    `uvm_declare_p_sequencer(uvm_tx_dma_calypte_cq::sequencer)
 
-    int unsigned packet_size_min = 64;
-    int unsigned packet_size_max = 2048;
+    int unsigned m_packet_size_min = 60;
+    int unsigned m_packet_size_max = 2048;
 
-    function new(string name = "uvm_dma_ll::sequence_simple");
+    function new(string name = "uvm_tx_dma_calypte::sequence_simple");
         super.new(name);
     endfunction
 
     task body();
-        uvm_common::sequence_cfg state;
+        uvm_common::sequence_cfg m_state;
 
-        uvm_dma_regs::start_channel start;
-        uvm_dma_regs::stop_channel  stop;
+        uvm_tx_dma_calypte_regs::start_channel_seq m_start_chan_seq;
+        uvm_tx_dma_calypte_regs::stop_channel_seq  m_stop_chan_seq;
 
-        start = uvm_dma_regs::start_channel::type_id::create("start", m_sequencer);
-        start.m_regmodel = p_sequencer.m_regmodel;
-        stop  = uvm_dma_regs::stop_channel ::type_id::create("stop",  m_sequencer);
-        stop.m_regmodel = p_sequencer.m_regmodel;
+        m_start_chan_seq = uvm_tx_dma_calypte_regs::start_channel_seq::type_id::create("m_start_chan_seq", m_sequencer);
+        m_start_chan_seq.m_regmodel_channel = p_sequencer.m_regmodel_channel;
+        m_stop_chan_seq  = uvm_tx_dma_calypte_regs::stop_channel_seq::type_id::create("m_stop_chan_seq",  m_sequencer);
+        m_stop_chan_seq.m_regmodel_channel = p_sequencer.m_regmodel_channel;
 
-        req = uvm_dma_ll_rx::sequence_item::type_id::create("req", m_sequencer);
+        req = uvm_tx_dma_calypte_cq::sequence_item::type_id::create("req", m_sequencer);
 
-        if(!uvm_config_db#(uvm_common::sequence_cfg)::get(m_sequencer, "", "state", state)) begin
-            state = null;
+        if(!uvm_config_db#(uvm_common::sequence_cfg)::get(m_sequencer, "", "state", m_state)) begin
+            m_state = null;
         end
 
-        while(state == null || !state.stopped()) begin
+        while(m_state == null || !m_state.stopped()) begin
             int unsigned wait_fork;
             int unsigned it;
             int unsigned transaction_count;
@@ -44,19 +44,19 @@ class sequence_simple extends uvm_sequence#(uvm_dma_ll_rx::sequence_item);
 
             //SLEEP TIME
             #(stop_time*100ns);
-            start.start(null);
+            m_start_chan_seq.start(null);
 
             //RUN DATA
             it = 0;
-            while(it < transaction_count && (state == null || state.next())) begin
+            while(it < transaction_count && (m_state == null || m_state.next())) begin
                 start_item(req);
-                assert(req.randomize() with {req.packet.size() inside {[packet_size_min:packet_size_max-1]};}) else `uvm_fatal(m_sequencer.get_full_name(), "\n\tCannot randomize packet");
+                assert(req.randomize() with {req.m_packet.size() inside {[m_packet_size_min:m_packet_size_max-1]};}) else `uvm_fatal(m_sequencer.get_full_name(), "\n\tCannot randomize packet");
                 finish_item(req);
 
                 it++;
             end
 
-            stop.start(null);
+            m_stop_chan_seq.start(null);
         end
     endtask
 endclass
