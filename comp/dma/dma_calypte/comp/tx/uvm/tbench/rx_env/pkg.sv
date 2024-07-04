@@ -8,7 +8,7 @@
 `ifndef TX_DMA_CALYPTE_CQ_ENV_PKG
 `define TX_DMA_CALYPTE_CQ_ENV_PKG
 
-package uvm_dma_ll_rx;
+package uvm_tx_dma_calypte_cq;
 
     `include "uvm_macros.svh"
     import uvm_pkg::*;
