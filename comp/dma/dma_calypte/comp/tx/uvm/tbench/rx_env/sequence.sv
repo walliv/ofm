@@ -8,15 +8,15 @@
 class base_send_sequence #(type T_ITEM) extends uvm_sequence #(T_ITEM);
     `uvm_object_param_utils(uvm_tx_dma_calypte_cq::base_send_sequence #(T_ITEM))
 
-    mailbox#(T_ITEM) tr_export;
+    mailbox #(T_ITEM) m_tr_export;
 
-    function new(string name = "sequence_simple_rx_base");
+    function new(string name = "base_send_sequence");
         super.new(name);
     endfunction
 
     task body;
         forever begin
-            tr_export.get(req);
+            m_tr_export.get(req);
             start_item(req);
             finish_item(req);
         end
