@@ -39,7 +39,7 @@ class regmodel_top #(CHANNELS) extends uvm_reg_block;
 
         //Add registers to map
         for(int unsigned it = 0; it < CHANNELS; it++) begin
-            this.default_map.add_submap(channel[it].default_map, it * 32'h80);
+            this.default_map.add_submap(m_regmodel_channel[it].default_map, it * 32'h80);
         end
 
         this.lock_model();
