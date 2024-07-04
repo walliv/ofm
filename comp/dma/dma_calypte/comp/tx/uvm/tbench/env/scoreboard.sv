@@ -186,8 +186,6 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     function new(string name, uvm_component parent);
         super.new(name, parent);
         // DUT MODEL COMUNICATION 
-        pcie_cq_data_subs         = new("pcie_cq_data_subs",        this);
-        pcie_cq_meta_subs         = new("pcie_cq_meta_subs",        this);
         tx_speed_meter            = new("tx_speed_meter",           this);
         m_usr_data_analysis_export  = new("m_usr_data_analysis_export", this);
         m_usr_meta_analysis_export  = new("m_usr_meta_analysis_export", this);
