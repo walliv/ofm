@@ -19,7 +19,6 @@ package uvm_tx_dma_calypte_cq;
     `include "sequence.sv"
     `include "driver.sv"
     `include "env.sv"
-
 endpackage
 
 `endif
