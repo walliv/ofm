@@ -26,7 +26,7 @@ endclass
 class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH) extends uvm_component;
     `uvm_component_param_utils(uvm_tx_dma_calypte::model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH))
 
-    localparam DATA_ADDR_MASK = 2**DATA_POINTER_WIDTH-1;
+    localparam DATA_ADDR_MASK = 2**DATA_POINTER_WIDTH-1;   
 
     uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)))                m_cq_data_analysis_fifo;
     uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector      ::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))) m_cq_meta_analysis_fifo;
@@ -55,6 +55,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
     function new (string name, uvm_component parent = null);
         super.new(name, parent);
+
         m_cq_data_analysis_fifo  = new("m_cq_data_analysis_fifo",  this);
         m_cq_meta_analysis_fifo  = new("m_cq_meta_analysis_fifo",  this);
         m_usr_data_analysis_port = new("m_usr_data_analysis_port", this);
