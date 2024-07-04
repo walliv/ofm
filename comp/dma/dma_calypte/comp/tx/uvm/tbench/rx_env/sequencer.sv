@@ -5,8 +5,8 @@
 
 // SPDX-License-Identifier: BSD-3-Clause
 
-class sequencer extends uvm_sequencer#(sequence_item);
-    `uvm_component_param_utils(uvm_dma_ll_rx::sequencer);
+class sequencer extends uvm_sequencer #(sequence_item);
+    `uvm_component_param_utils(uvm_tx_dma_calypte_cq::sequencer);
 
     uvm_reset::sync_terminate    reset_sync;
     uvm_dma_regs::reg_channel    m_regmodel;
