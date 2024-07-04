@@ -14,8 +14,8 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
     uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item                          #(USR_MFB_ITEM_WIDTH))  m_dut_data_analysis_fifo;
     uvm_tlm_analysis_fifo #(uvm_logic_vector      ::sequence_item                          #(USR_MFB_META_WIDTH))  m_dut_meta_analysis_fifo;
 
-    int unsigned      errors;
-    int unsigned      compared;
+    int unsigned      m_errors;
+    int unsigned      m_compared;
     uvm_common::stats m_delay;
 
     function new(string name, uvm_component parent);
@@ -24,8 +24,8 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
         m_model_meta_analysis_fifo = new("m_model_meta_analysis_fifo", this);
         m_dut_data_analysis_fifo   = new("m_dut_data_analysis_fifo",   this);
         m_dut_meta_analysis_fifo   = new("m_dut_meta_analysis_fifo",   this);
-        errors     = 0;
-        compared   = 0;
+        m_errors     = 0;
+        m_compared   = 0;
     endfunction
 
     task print_meta_compare_error(uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)  tr_model_meta,
@@ -35,7 +35,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
 
         $swrite(msg, "%s\n\nMETA COMPARISON CHANNEL %d", msg, tr_model_meta.data[$clog2(CHANNELS)+24-1 : 24]);
         $swrite(msg, "%s\n===============================================\n", msg);
-        $swrite(msg, "%s\n Comparison failed at meta number %d! \n\tModel meta:\n%s\n\tDUT meta:\n%s\n", msg, compared, tr_model_meta.convert2string(), tr_dut_meta.convert2string());
+        $swrite(msg, "%s\n Comparison failed at meta number %d! \n\tModel meta:\n%s\n\tDUT meta:\n%s\n", msg, m_compared, tr_model_meta.convert2string(), tr_dut_meta.convert2string());
         $swrite(msg, "%s\n DMA MODEL META %h", msg, tr_model_meta.data[23 : 0]);
         $swrite(msg, "%s\n DMA MODEL CHANNEL %d", msg, tr_model_meta.data[$clog2(CHANNELS)+24-1 : 24]);
         $swrite(msg, "%s\n DMA MODEL SIZE %d\n", msg, tr_model_meta.data[USR_MFB_META_WIDTH-1 : $clog2(CHANNELS)+24]);
@@ -63,7 +63,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
 
         $swrite(msg, "%s\n\nDATA COMPARISON CHANNEL %d", msg, tr_model_meta.data[$clog2(CHANNELS)+24-1 : 24]);
         $swrite(msg, "%s\n=============================================================================================================================\n", msg);
-        $swrite(msg, "%s\n\t Comparison failed at data number %d! \n\tModel data:\n%s\n\tDUT data:\n%s\n", msg, compared, tr_model_mfb.convert2string(), tr_dut_mfb.convert2string());
+        $swrite(msg, "%s\n\t Comparison failed at data number %d! \n\tModel data:\n%s\n\tDUT data:\n%s\n", msg, m_compared, tr_model_mfb.convert2string(), tr_dut_mfb.convert2string());
         $swrite(msg, "%s\n=============================================================================================================================\n", msg);
         `uvm_error(this.get_full_name(), msg);
     endtask
@@ -106,7 +106,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
             tr_dut_mfb_fifo[int'(dut_channel)]     .push_back(tr_dut_mfb.item);
             tr_dut_meta_fifo[int'(dut_channel)]    .push_back(tr_dut_meta);
 
-            compared++;
+            m_compared++;
 
             for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
 
@@ -116,7 +116,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
                     tr_model_meta_comp = tr_model_meta_fifo[chan].pop_front();
 
                     if (tr_model_meta_comp.compare(tr_dut_meta_comp) == 0) begin
-                        errors++;
+                        m_errors++;
                         print_meta_compare_error(tr_model_meta_comp, tr_dut_meta_comp);
                     end
                 end
@@ -127,7 +127,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
                     tr_model_mfb_comp = tr_model_mfb_fifo[chan].pop_front();
 
                     if (tr_model_mfb_comp.compare(tr_dut_mfb_comp) == 0) begin
-                        errors++;
+                        m_errors++;
                         print_data_compare_error(tr_dut_mfb_comp, tr_model_mfb_comp, tr_model_meta_comp);
                     end
                 end
@@ -135,7 +135,7 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
 
             debug_msg = "\n";
             $swrite(debug_msg, "%s================================================================================= \n", debug_msg);
-            $swrite(debug_msg, "%SDUT TRANSACTION %0d COMPARED!\n", debug_msg, compared);
+            $swrite(debug_msg, "%SDUT TRANSACTION %0d COMPARED!\n", debug_msg, m_compared);
             $swrite(debug_msg, "%s================================================================================= \n", debug_msg);
             $swrite(debug_msg, "%sCHANNEL : %0d\n", debug_msg, dut_channel);
             $swrite(debug_msg, "%sDATA    : %s\n",  debug_msg, tr_dut_mfb.item.convert2string());
@@ -152,22 +152,23 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     `uvm_component_param_utils(uvm_tx_dma_calypte::scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH))
 
     //INPUT TO DUT
-    uvm_common::subscriber #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))          pcie_cq_data_subs;
-    uvm_common::subscriber #(uvm_logic_vector::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)) pcie_cq_meta_subs;
-    uvm_analysis_export #(uvm_logic_vector::sequence_item #(1))                                        pkt_drop_analysis_export;
+    uvm_common::subscriber #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))          m_pcie_cq_data_subs;
+    uvm_common::subscriber #(uvm_logic_vector::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)) m_pcie_cq_meta_subs;
+    uvm_analysis_export    #(uvm_logic_vector::sequence_item #(1))                                     m_pkt_drop_analysis_export;
+
     //DUT OUTPUT
-    uvm_analysis_export #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) usr_data_analysis_export;
-    uvm_analysis_export #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       usr_meta_analysis_export;
+    uvm_analysis_export #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) m_usr_data_analysis_export;
+    uvm_analysis_export #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       m_usr_meta_analysis_export;
 
     model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH) m_model;
 
-    local uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS)                                    m_regmodel_top;
-    uvm_common::comparer_ordered#(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) data_cmp;
-    uvm_common::comparer_ordered#(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       meta_cmp;
+    local uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS)                                     m_regmodel_top;
+    uvm_common::comparer_ordered #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) m_data_cmp;
+    uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       m_meta_cmp;
     // compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH)                                tr_compare;
 
-    local int unsigned compared;
-    local int unsigned errors;
+    local int unsigned m_compared;
+    local int unsigned m_errors;
 
     uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
@@ -184,26 +185,25 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     // Contructor of scoreboard.
     function new(string name, uvm_component parent);
         super.new(name, parent);
-        // DUT MODEL COMUNICATION
-        usr_data_analysis_export  = new("usr_data_analysis_export", this);
         tx_speed_meter            = new("tx_speed_meter",           this);
-        usr_meta_analysis_export  = new("usr_meta_analysis_export", this);
-        pkt_drop_analysis_export  = new("pkt_drop_analysis_export", this);
+        m_usr_data_analysis_export  = new("m_usr_data_analysis_export", this);
+        m_usr_meta_analysis_export  = new("m_usr_meta_analysis_export", this);
+        m_pkt_drop_analysis_export  = new("m_pkt_drop_analysis_export", this);
 
         //LOCAL VARIABLES
         rx_speed_meter = new("rx_speed_meter", this);
         m_delay        = new();
         m_output_speed = new();
         m_input_speed  = new();
-        compared       = 0;
-        errors         = 0;
+        m_compared       = 0;
+        m_errors         = 0;
     endfunction
 
     function int unsigned used();
         int unsigned ret = 0;
         ret |= m_model.used() != 0;
-        ret |= data_cmp.used() != 0;
-        ret |= meta_cmp.used() != 0;
+        ret |= m_data_cmp.used() != 0;
+        ret |= m_meta_cmp.used() != 0;
         return ret;
     endfunction
 
@@ -214,32 +214,33 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
     //build phase
     function void build_phase(uvm_phase phase);
-        m_model    = model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH)::type_id::create("m_model", this);
-        data_cmp   = uvm_common::comparer_ordered #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))          ::type_id::create("data_cmp", this);
-        meta_cmp   = uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))                ::type_id::create("meta_cmp", this);
+        m_model    = model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH)::type_id::create("m_model",    this);
+        m_data_cmp   = uvm_common::comparer_ordered #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))        ::type_id::create("m_data_cmp", this);
+        m_meta_cmp   = uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))              ::type_id::create("m_meta_cmp", this);
         // tr_compare = compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH)                                          ::type_id::create("tr_compare", this);
 
-        pcie_cq_data_subs = uvm_common::subscriber #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))         ::type_id::create("pcie_cq_data_subs",this);
-        pcie_cq_meta_subs = uvm_common::subscriber #(uvm_logic_vector::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::type_id::create("pcie_cq_meta_subs",this);
+        m_pcie_cq_data_subs = uvm_common::subscriber #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))         ::type_id::create("m_pcie_cq_data_subs",this);
+        m_pcie_cq_meta_subs = uvm_common::subscriber #(uvm_logic_vector::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::type_id::create("m_pcie_cq_meta_subs",this);
     endfunction
 
     function void connect_phase(uvm_phase phase);
-        pcie_cq_data_subs.port.connect(m_model.analysis_imp_rx_data.analysis_export);
-        pcie_cq_data_subs.port.connect(rx_speed_meter.analysis_export);
-        pcie_cq_meta_subs.port.connect(m_model.analysis_imp_rx_meta.analysis_export);
+        m_pcie_cq_data_subs.port.connect(m_model.m_cq_data_analysis_fifo.analysis_export);
+        m_pcie_cq_data_subs.port.connect(rx_speed_meter.analysis_export);
+        m_pcie_cq_meta_subs.port.connect(m_model.m_cq_meta_analysis_fifo.analysis_export);
 
-        m_model.analysis_port_tx_data.connect(data_cmp.analysis_imp_model);
-        m_model.analysis_port_tx_meta.connect(meta_cmp.analysis_imp_model);
+        m_model.m_usr_data_analysis_port.connect(m_data_cmp.analysis_imp_model);
+        m_model.m_usr_meta_analysis_port.connect(m_meta_cmp.analysis_imp_model);
 
-        usr_data_analysis_export.connect(data_cmp.analysis_imp_dut);
-        usr_data_analysis_export.connect(tx_speed_meter.analysis_export);
-        usr_meta_analysis_export.connect(meta_cmp.analysis_imp_dut);
+        m_usr_data_analysis_export.connect(m_data_cmp.analysis_imp_dut);
+        m_usr_data_analysis_export.connect(tx_speed_meter.analysis_export);
+        m_usr_meta_analysis_export.connect(m_meta_cmp.analysis_imp_dut);
         // tr_compare.m_delay = m_delay;
-        pkt_drop_analysis_export.connect(m_model.discard_comp.analysis_imp_rx_dma.analysis_export);
+        m_pkt_drop_analysis_export.connect(m_model.m_discard_comp.m_internal_meta_analysis_fifo.analysis_export);
     endfunction
 
     task run_output();
         uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH) tr_dut;
+
         int unsigned speed_packet_size = 0;
         time         speed_start_time  = 0ns;
 
@@ -303,8 +304,8 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         real modus;
         string msg = "\n";
 
-        // errors   = tr_compare.errors;
-        // compared = tr_compare.compared;
+        // m_errors   = tr_compare.m_errors;
+        // m_compared = tr_compare.m_compared;
 
         if (this.get_report_verbosity_level() >= UVM_LOW) begin
             m_delay.count(min, max, avg, std_dev);
@@ -315,7 +316,7 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
             $swrite(msg, "%s\n\tSpeed output statistic (MFB TX) => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
         end
 
-        if (errors == 0 && this.used() == 0) begin
+        if (m_errors == 0 && this.used() == 0) begin
 
             // $swrite(msg, "%s================================================================================= \n", msg);
             // $swrite(msg, "%s\nEXPORT USED                        \n", msg                                             );
@@ -361,12 +362,12 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
                 $swrite(msg, "%s================================================================================= \n", msg);
             end
 
-            $swrite(msg, "%sCompared packets: %0d", msg, compared);
+            $swrite(msg, "%sCompared packets: %0d", msg, m_compared);
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION SUCCESS      ----\n\t---------------------------------------"}, UVM_NONE)
         end else begin
             string msg = "";
 
-            $swrite(msg, "%sCompared packets: %0d errors %0d", msg, compared, errors);
+            $swrite(msg, "%sCompared packets: %0d errors %0d", msg, m_compared, m_errors);
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION FAILED       ----\n\t---------------------------------------"}, UVM_NONE)
         end
     endfunction
