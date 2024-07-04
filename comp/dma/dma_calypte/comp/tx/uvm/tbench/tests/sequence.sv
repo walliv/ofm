@@ -37,8 +37,8 @@ class virt_seq #(
     localparam USR_MFB_META_WIDTH = HDR_META_WIDTH + $clog2(PKT_SIZE_MAX+1) + $clog2(CHANNELS);
 
     uvm_reset::sequence_start                                                                                                                  m_reset_seq;
-    uvm_dma_ll::sequence_simple                                                                                                                m_channel_seq [CHANNELS];
     uvm_sequence #(uvm_mfb::sequence_item #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)) m_pcie_seq;
+    uvm_tx_dma_calypte::sequence_simple                                                                                                        m_channel_seq [CHANNELS];
 
     local logic [CHANNELS-1:0] m_done;
 
@@ -52,8 +52,8 @@ class virt_seq #(
         m_reset_seq = uvm_reset::sequence_start::type_id::create("rst_seq");
 
         for (int unsigned it = 0; it < CHANNELS; it++) begin
-            m_channel_seq[it] = uvm_dma_ll::sequence_simple::type_id::create($sformatf("channel_%0d", it));
             m_channel_seq[it].packet_size_max = PKT_SIZE_MAX;
+            m_channel_seq[it] = uvm_tx_dma_calypte::sequence_simple::type_id::create($sformatf("channel_%0d", it));
         end
 
         m_pcie_seq_lib = uvm_mfb::sequence_lib_tx#(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)::type_id::create("m_pcie_seq_lib");
