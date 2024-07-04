@@ -6,7 +6,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 class sequence_item extends uvm_sequence_item;
-    `uvm_object_param_utils(uvm_dma_ll_rx::sequence_item)
+    `uvm_object_param_utils(uvm_tx_dma_calypte_cq::sequence_item)
 
     localparam ITEM_WIDTH = 8;
     localparam META_WIDTH = 24;
