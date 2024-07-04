@@ -3,7 +3,54 @@
 TX DMA Calypte
 ==============
 
-.. vhdl:autoentity:: TX_DMA_CALYPTE
+
+Control/status registers
+------------------------
+
+In order for the controller to be controlled by the software, an address space
+with configuration/status (C/S) registers is initialized. Currently, each
+channel contains its own set of registers with the overall size of 128 B. The
+1st channel's registers are located on the address x00, the second on x80, the
+third on x100, etc. The address offset of the whole TX controller within the DMA
+engine is x200000. The registers are connected through :ref:`MI bus <mi_bus>` to
+the global configuration tree. The set of C/S for each channel is listed in
+table XXX.
+
+.. list-table:: Tab. 1
+    :align: center
+    :widths: auto
+    :header-rows: 1
+
+    * - Address
+      - Name
+      - Access permission (HW/SW)
+      - Description
+      - Notes
+    * - 0x00
+      - Control
+      - R/W
+      - Bit 0: Set to 1 to request the enable of a channel. Set to 0 to request stop of a channel.
+      - \-
+    * - 0x04
+      - Status
+      - W/R
+      - Bit 0: Set to 1 if a channel is enabled. Set to 0 if the channel is disabled.
+      - \-
+    * - 0x08
+      - -Reserved-
+      - N/A
+      - \-
+      - \-
+    * - 0x0C
+      - -Reserved-
+      - N/A
+      - \-
+      - \-
+    * - 0x10
+      - Software data pointer (SDP)
+      - R/W
+      - Writing pointer for data (up to 16 bits)
+      - \-
 
 .. toctree::
    :maxdepth: 1
@@ -19,7 +66,6 @@ General subcomponents
 ---------------------
 * :ref:`mvb_fifox`
 
-
 ----------------
 UVM Verification
 ----------------
@@ -32,7 +78,7 @@ UVM Verification
 Verification Plan
 -----------------
 
-.. list-table:: Tab. 1
+.. list-table:: Tab. 2
     :align: center
     :widths: 5 15 5 5 10 5
     :header-rows: 1
@@ -91,7 +137,7 @@ There are five tests in the Multiver script.
    * - conf name
      - Regions
      - Max packet size
-     - buffer addres width (DATA, HDR)
+     - buffer address width (DATA, HDR)
      - PCIE LEN (MIN, MAX)
      - channels num
 
