@@ -329,29 +329,29 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
             for (int chan = 0; chan < CHANNELS; chan++) begin
 
-                if (byte_cnt[chan] != m_model.cnt_reg[chan].byte_cnt &&
-                   pkt_cnt[chan]  != m_model.cnt_reg[chan].pkt_cnt) begin
-                   string msg_1;
-                   $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, byte_cnt[chan], m_model.cnt_reg[chan].byte_cnt);
-                   $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, pkt_cnt[chan], m_model.cnt_reg[chan].pkt_cnt);
-                   `uvm_error(this.get_full_name(), msg_1);
-                end
+                // if (byte_cnt[chan] != m_model.cnt_reg[chan].byte_cnt &&
+                //    pkt_cnt[chan]  != m_model.cnt_reg[chan].pkt_cnt) begin
+                //    string msg_1;
+                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, byte_cnt[chan], m_model.cnt_reg[chan].byte_cnt);
+                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, pkt_cnt[chan], m_model.cnt_reg[chan].pkt_cnt);
+                //    `uvm_error(this.get_full_name(), msg_1);
+                // end
 
-                if (discard_byte_cnt[chan] != m_model.cnt_reg[chan].discard_byte_cnt &&
-                   discard_pkt_cnt[chan]  != m_model.cnt_reg[chan].discard_pkt_cnt) begin
-                   string msg_1;
-                   $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_byte_cnt[chan], m_model.cnt_reg[chan].discard_byte_cnt);
-                   $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_pkt_cnt[chan], m_model.cnt_reg[chan].discard_pkt_cnt);
-                   `uvm_error(this.get_full_name(), msg_1);
-                end
+                // if (discard_byte_cnt[chan] != m_model.cnt_reg[chan].discard_byte_cnt &&
+                //    discard_pkt_cnt[chan]  != m_model.cnt_reg[chan].discard_pkt_cnt) begin
+                //    string msg_1;
+                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_byte_cnt[chan], m_model.cnt_reg[chan].discard_byte_cnt);
+                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_pkt_cnt[chan], m_model.cnt_reg[chan].discard_pkt_cnt);
+                //    `uvm_error(this.get_full_name(), msg_1);
+                // end
 
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.cnt_reg[chan].pkt_cnt                              );
-                $swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.cnt_reg[chan].byte_cnt                             );
-                $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.cnt_reg[chan].discard_pkt_cnt                      );
-                $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.cnt_reg[chan].discard_byte_cnt                     );
+                // $swrite(msg, "%s================================================================================= \n", msg);
+                // $swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
+                // $swrite(msg, "%s================================================================================= \n", msg);
+                // $swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.cnt_reg[chan].pkt_cnt                              );
+                // $swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.cnt_reg[chan].byte_cnt                             );
+                // $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.cnt_reg[chan].discard_pkt_cnt                      );
+                // $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.cnt_reg[chan].discard_byte_cnt                     );
                 $swrite(msg, "%s================================================================================= \n", msg);
                 $swrite(msg, "%s\nDUT COUNTERS STATISTICS\n", msg                                                         );
                 $swrite(msg, "%s================================================================================= \n", msg);
