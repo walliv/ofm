@@ -185,13 +185,13 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     // Contructor of scoreboard.
     function new(string name, uvm_component parent);
         super.new(name, parent);
-        tx_speed_meter            = new("tx_speed_meter",           this);
         m_usr_data_analysis_export  = new("m_usr_data_analysis_export", this);
         m_usr_meta_analysis_export  = new("m_usr_meta_analysis_export", this);
         m_pkt_drop_analysis_export  = new("m_pkt_drop_analysis_export", this);
 
         //LOCAL VARIABLES
         rx_speed_meter = new("rx_speed_meter", this);
+        tx_speed_meter = new("tx_speed_meter", this);
         m_delay        = new();
         m_output_speed = new();
         m_input_speed  = new();
