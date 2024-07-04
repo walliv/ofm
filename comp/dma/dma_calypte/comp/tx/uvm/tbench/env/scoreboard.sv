@@ -28,8 +28,8 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
         m_compared   = 0;
     endfunction
 
-    task print_meta_compare_error(uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)  tr_model_meta,
-                                  uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)  tr_dut_meta);
+    task print_meta_compare_error(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH) tr_model_meta,
+                                  uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH) tr_dut_meta);
 
         string msg;
 
@@ -46,9 +46,9 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
         `uvm_error(this.get_full_name(), msg);
     endtask
 
-    task print_data_compare_error(uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH) tr_dut_mfb,
-                                  uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH) tr_model_mfb,
-                                  uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)  tr_model_meta);
+    task print_data_compare_error(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH) tr_dut_mfb,
+                                  uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH) tr_model_mfb,
+                                  uvm_logic_vector::sequence_item       #(USR_MFB_META_WIDTH) tr_model_meta);
 
         string msg;
         int unsigned             bad_tr_pos[$];
@@ -69,20 +69,20 @@ class compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH) extends uvm_co
     endtask
 
     task run_phase(uvm_phase phase);
-        uvm_common::model_item #(uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)) tr_model_mfb;
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_model_meta;
-        uvm_common::model_item #(uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)) tr_dut_mfb;
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_dut_meta;
+        uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) tr_model_mfb;
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_model_meta;
+        uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)) tr_dut_mfb;
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_dut_meta;
 
-        uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)                           tr_dut_mfb_comp;
-        uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)                           tr_model_mfb_comp;
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_dut_meta_comp;
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_model_meta_comp;
+        uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)                           tr_dut_mfb_comp;
+        uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)                           tr_model_mfb_comp;
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_dut_meta_comp;
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_model_meta_comp;
 
-        uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)                           tr_model_mfb_fifo[CHANNELS][$];
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_model_meta_fifo[CHANNELS][$];
-        uvm_logic_vector_array::sequence_item#(USR_MFB_ITEM_WIDTH)                           tr_dut_mfb_fifo[CHANNELS][$];
-        uvm_logic_vector::sequence_item#(USR_MFB_META_WIDTH)                                 tr_dut_meta_fifo[CHANNELS][$];
+        uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)                           tr_model_mfb_fifo  [CHANNELS][$];
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_model_meta_fifo [CHANNELS][$];
+        uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH)                           tr_dut_mfb_fifo    [CHANNELS][$];
+        uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH)                                 tr_dut_meta_fifo   [CHANNELS][$];
 
         int unsigned                   bad_tr_pos[$];
         logic [$clog2(CHANNELS)-1 : 0] model_channel;
@@ -179,8 +179,8 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     local uvm_common::stats                                                                        m_input_speed;
     local uvm_common::stats                                                                        m_delay;
     local uvm_common::stats                                                                        m_output_speed;
-    local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))     tx_speed_meter;
-    local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)) rx_speed_meter;
+    local uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))) rx_speed_meter;
+    local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))                               tx_speed_meter;
 
     // Contructor of scoreboard.
     function new(string name, uvm_component parent);
