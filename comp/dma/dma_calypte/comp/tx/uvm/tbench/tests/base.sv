@@ -23,6 +23,7 @@ class base extends uvm_test;
         PCIE_CQ_MFB_ITEM_WIDTH,
 
         CHANNELS,
+        HDR_META_WIDTH,
         DATA_POINTER_WIDTH,
         PKT_SIZE_MAX,
         PCIE_LEN_MAX
@@ -49,10 +50,10 @@ class base extends uvm_test;
     endfunction
 
     function void build_phase(uvm_phase phase);
-                                  PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH,
-                                  CHANNELS, DATA_POINTER_WIDTH, PKT_SIZE_MAX, PCIE_LEN_MAX )::type_id::create("m_env", this);
         m_env = uvm_tx_dma_calypte::env #(DEVICE, MI_WIDTH,
                                           USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH,
+                                          PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH,
+                                          CHANNELS, HDR_META_WIDTH, DATA_POINTER_WIDTH, PKT_SIZE_MAX, PCIE_LEN_MAX)::type_id::create("m_env", this);
     endfunction
 
     // ------------------------------------------------------------------------
