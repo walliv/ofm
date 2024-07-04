@@ -24,7 +24,7 @@ module testbench;
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // Interfaces
     reset_if                                                                                                                                      reset_vif             (CLK);
-    mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)                        usr_tx_mfb_vif        (CLK);
+    mfb_if #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH)                                    usr_mfb_vif           (CLK);
     mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) cq_mfb_vif            (CLK);
     // This is a bit confusing that the mvb interface is callled mfb in its name but that is because the
     // internal metainformation are transported as MFB metadata.
@@ -41,10 +41,10 @@ module testbench;
         uvm_root m_root;
 
         // Configuration of database
-        uvm_config_db#(virtual reset_if)                                                                                                                                     ::set(null, "", "reset_vif",        reset_vif);
-        uvm_config_db#(virtual mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::set(null, "", "cq_mfb_vif",       cq_mfb_vif);
-        uvm_config_db#(virtual mi_if  #(MI_WIDTH, MI_WIDTH))                                                                                                                 ::set(null, "", "config_mi_vif",    config_mi_vif);
-        uvm_config_db#(virtual mfb_if #(USR_TX_MFB_REGIONS, USR_TX_MFB_REGION_SIZE, USR_TX_MFB_BLOCK_SIZE, USR_TX_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH))                       ::set(null, "", "usr_tx_mfb_vif",   usr_tx_mfb_vif);
+        uvm_config_db#(virtual reset_if)                                                                                                                                     ::set(null, "", "reset_vif",             reset_vif);
+        uvm_config_db#(virtual mfb_if #(PCIE_CQ_MFB_REGIONS, PCIE_CQ_MFB_REGION_SIZE, PCIE_CQ_MFB_BLOCK_SIZE, PCIE_CQ_MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH))::set(null, "", "cq_mfb_vif",            cq_mfb_vif);
+        uvm_config_db#(virtual mi_if  #(MI_WIDTH, MI_WIDTH))                                                                                                                 ::set(null, "", "config_mi_vif",         config_mi_vif);
+        uvm_config_db#(virtual mfb_if #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH))                                   ::set(null, "", "usr_mfb_vif",           usr_mfb_vif);
         uvm_config_db#(virtual mvb_if #(PCIE_CQ_MFB_REGIONS, 1))                                                                                                             ::set(null, "", "internal_meta_mfb_vif", internal_meta_mfb_vif);
 
         m_root = uvm_root::get();
@@ -61,18 +61,18 @@ module testbench;
     DUT DUT_U (
         .CLK       (CLK),
         .RST       (reset_vif.RESET),
-        .mfb_rx    (cq_mfb_vif),
-        .mfb_tx    (usr_tx_mfb_vif),
+        .cq_mfb    (cq_mfb_vif),
+        .usr_mfb   (usr_mfb_vif),
         .config_mi (config_mi_vif)
     );
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
     // Properties
     TX_DMA_CALYPTE_PROPERTY #(
-        .USR_TX_MFB_REGIONS      (USR_TX_MFB_REGIONS),
-        .USR_TX_MFB_REGION_SIZE  (USR_TX_MFB_REGION_SIZE),
-        .USR_TX_MFB_BLOCK_SIZE   (USR_TX_MFB_BLOCK_SIZE),
-        .USR_TX_MFB_ITEM_WIDTH   (USR_TX_MFB_ITEM_WIDTH),
+        .USR_MFB_REGIONS         (USR_MFB_REGIONS),
+        .USR_MFB_REGION_SIZE     (USR_MFB_REGION_SIZE),
+        .USR_MFB_BLOCK_SIZE      (USR_MFB_BLOCK_SIZE),
+        .USR_MFB_ITEM_WIDTH      (USR_MFB_ITEM_WIDTH),
         .PCIE_CQ_MFB_REGIONS     (PCIE_CQ_MFB_REGIONS),
         .PCIE_CQ_MFB_REGION_SIZE (PCIE_CQ_MFB_REGION_SIZE),
         .PCIE_CQ_MFB_BLOCK_SIZE  (PCIE_CQ_MFB_BLOCK_SIZE),
@@ -80,8 +80,8 @@ module testbench;
         .USR_MFB_META_WIDTH      (USR_MFB_META_WIDTH)
     ) tx_dma_calypte_property_i (
         .RESET                   (reset_vif.RESET),
-        .mfb_rx                  (cq_mfb_vif),
-        .mfb_tx                  (usr_tx_mfb_vif)
+        .cq_mfb                  (cq_mfb_vif),
+        .usr_mfb                 (usr_mfb_vif)
     );
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------------------
