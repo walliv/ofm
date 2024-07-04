@@ -9,10 +9,10 @@ import uvm_pkg::*;
 `include "uvm_macros.svh"
 
 module TX_DMA_CALYPTE_PROPERTY #(
-    USR_TX_MFB_REGIONS,
-    USR_TX_MFB_REGION_SIZE,
-    USR_TX_MFB_BLOCK_SIZE,
-    USR_TX_MFB_ITEM_WIDTH,
+    USR_MFB_REGIONS,
+    USR_MFB_REGION_SIZE,
+    USR_MFB_BLOCK_SIZE,
+    USR_MFB_ITEM_WIDTH,
 
     PCIE_CQ_MFB_REGIONS,
     PCIE_CQ_MFB_REGION_SIZE,
@@ -23,7 +23,7 @@ module TX_DMA_CALYPTE_PROPERTY #(
 ) (
     input logic RESET,
     mfb_if cq_mfb,
-    mfb_if usr_tx_mfb
+    mfb_if usr_mfb
 );
 
     string module_name = "";
@@ -33,7 +33,7 @@ module TX_DMA_CALYPTE_PROPERTY #(
     // Start check properties after first clock
     initial begin
         $sformat(module_name, "%m");
-        @(posedge usr_tx_mfb.CLK)
+        @(posedge usr_mfb.CLK)
         #(10ps)
         START = 1'b0;
     end
@@ -50,13 +50,13 @@ module TX_DMA_CALYPTE_PROPERTY #(
     );
 
     mfb_property #(
-        .REGIONS     (USR_TX_MFB_REGIONS),
-        .REGION_SIZE (USR_TX_MFB_REGION_SIZE),
-        .BLOCK_SIZE  (USR_TX_MFB_BLOCK_SIZE),
-        .ITEM_WIDTH  (USR_TX_MFB_ITEM_WIDTH),
+        .REGIONS     (USR_MFB_REGIONS),
+        .REGION_SIZE (USR_MFB_REGION_SIZE),
+        .BLOCK_SIZE  (USR_MFB_BLOCK_SIZE),
+        .ITEM_WIDTH  (USR_MFB_ITEM_WIDTH),
         .META_WIDTH  (USR_MFB_META_WIDTH)
-    ) usr_tx_mfb_property_i (
+    ) usr_mfb_property_i (
         .RESET (RESET),
-        .vif   (usr_tx_mfb)
+        .vif   (usr_mfb)
     );
 endmodule
