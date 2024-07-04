@@ -269,13 +269,13 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         time         speed_start_time  = 0ns;
 
         forever begin
-            uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH) tr;
+            uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)) tr;
             time time_act;
             time speed_metet_duration;
             rx_speed_meter.get(tr);
             time_act = $time();
 
-            speed_packet_size += tr.data.size();
+            speed_packet_size += tr.item.data.size();
             speed_metet_duration = time_act - speed_start_time;
             if (speed_metet_duration >= 10us) begin
                 real speed;
