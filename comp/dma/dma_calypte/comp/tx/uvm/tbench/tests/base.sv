@@ -75,25 +75,25 @@ class base extends uvm_test;
         m_virt_seq.start(m_env.m_sequencer);
 
         time_start = $time();
-        while((time_start + 500us) > $time() && m_env.sc.used()) begin
+        while((time_start + 500us) > $time() && m_env.m_scoreboard.used()) begin
             #(600ns);
         end
 
         for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
-            m_env.m_regmodel.m_regmodel.channel[chan].sent_packets.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].sent_packets.read(status_r, pkt_cnt[chan]);
-            m_env.m_regmodel.m_regmodel.channel[chan].sent_bytes.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].sent_bytes.read(status_r, byte_cnt[chan]);
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].sent_packets_reg.write(status_r, {32'h1, 32'h1});
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].sent_packets_reg.read(status_r, pkt_cnt[chan]);
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].sent_bytes_reg.write(status_r, {32'h1, 32'h1});
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].sent_bytes_reg.read(status_r, byte_cnt[chan]);
 
-            m_env.m_regmodel.m_regmodel.channel[chan].discarded_packets.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].discarded_packets.read(status_r, discard_pkt_cnt[chan]);
-            m_env.m_regmodel.m_regmodel.channel[chan].discarded_bytes.write(status_r, {32'h1, 32'h1});
-            m_env.m_regmodel.m_regmodel.channel[chan].discarded_bytes.read(status_r, discard_byte_cnt[chan]);
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].discarded_packets_reg.write(status_r, {32'h1, 32'h1});
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].discarded_packets_reg.read(status_r, discard_pkt_cnt[chan]);
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].discarded_bytes_reg.write(status_r, {32'h1, 32'h1});
+            m_env.m_regmodel_top.m_regmodel.m_regmodel_channel[chan].discarded_bytes_reg.read(status_r, discard_byte_cnt[chan]);
 
-            m_env.sc.byte_cnt[chan]         = byte_cnt[chan];
-            m_env.sc.pkt_cnt[chan]          = pkt_cnt[chan];
-            m_env.sc.discard_byte_cnt[chan] = discard_byte_cnt[chan];
-            m_env.sc.discard_pkt_cnt[chan]  = discard_pkt_cnt[chan];
+            m_env.m_scoreboard.byte_cnt[chan]         = byte_cnt[chan];
+            m_env.m_scoreboard.pkt_cnt[chan]          = pkt_cnt[chan];
+            m_env.m_scoreboard.discard_byte_cnt[chan] = discard_byte_cnt[chan];
+            m_env.m_scoreboard.discard_pkt_cnt[chan]  = discard_pkt_cnt[chan];
         end
 
         phase.drop_objection(this);
