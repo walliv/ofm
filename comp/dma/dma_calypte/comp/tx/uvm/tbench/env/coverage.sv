@@ -28,19 +28,19 @@ class coverage #(MFB_REGIONS, MFB_REGION_SIZE, MFB_BLOCK_SIZE, MFB_ITEM_WIDTH, M
 
     function new (string name, uvm_component parent = null);
         super.new(name, parent);
-        if (REGIONS == 1) begin
+        if (MFB_REGIONS == 1) begin
             m_cov_seq_item_sof_eof_count = new();
         end
     endfunction
 
-    virtual function void write(uvm_mfb::sequence_item #(REGIONS,REGION_SIZE,BLOCK_SIZE,ITEM_WIDTH,META_WIDTH) t);
-        if (REGIONS == 1) begin
+    virtual function void write(uvm_mfb::sequence_item #(MFB_REGIONS, MFB_REGION_SIZE, MFB_BLOCK_SIZE, MFB_ITEM_WIDTH, MFB_META_WIDTH) t);
+        if (MFB_REGIONS == 1) begin
             m_cov_seq_item_sof_eof_count.sample(t);
         end
     endfunction
 
     function void display();
-        if (REGIONS == 1) begin
+        if (MFB_REGIONS == 1) begin
             $write("Pkt SOF/EOF counts coverage %f %%\n", m_cov_seq_item_sof_eof_count.get_inst_coverage());
         end
     endfunction
