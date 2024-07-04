@@ -31,6 +31,7 @@ class virt_seq #(
         USR_MFB_BLOCK_SIZE,
         USR_MFB_ITEM_WIDTH,
         CHANNELS,
+        HDR_META_WIDTH,
         PKT_SIZE_MAX
     ))
 
