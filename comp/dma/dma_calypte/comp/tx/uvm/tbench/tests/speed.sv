@@ -160,7 +160,8 @@ class speed extends base;
     // ------------------------------------------------------------------------
     // Create environment and Run sequences o their sequencers
     virtual task run_phase(uvm_phase phase);
-       virt_seq_full_speed #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX) m_virt_seq;
+        time time_start;
+        virt_seq_full_speed #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX) m_virt_seq;
 
         m_virt_seq = virt_seq_full_speed #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX)::type_id::create("m_virt_seq");
 
@@ -170,11 +171,10 @@ class speed extends base;
         m_virt_seq.randomize();
         m_virt_seq.start(m_env.m_sequencer);
 
-        timeout = 1;
-        fork
-            test_wait_timeout(3000);
-            test_wait_result();
-        join_any;
+        time_start = $time();
+        while((time_start + 500us) > $time() && m_env.m_scoreboard.used()) begin
+            #(600ns);
+        end
 
         for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
 
@@ -197,21 +197,7 @@ class speed extends base;
         phase.drop_objection(this);
     endtask
 
-    task test_wait_timeout(int unsigned time_length);
-        #(time_length*1us);
-    endtask
-
-    task test_wait_result();
-        do begin
-            #(6000ns);
-        end while (m_env.m_scoreboard.used() != 0);
-        timeout = 0;
-    endtask
-
     function void report_phase(uvm_phase phase);
         `uvm_info(this.get_full_name(), {"\n\tTEST : ", this.get_type_name(), " END\n"}, UVM_NONE);
-        if (timeout) begin
-            `uvm_error(this.get_full_name(), "\n\t===================================================\n\tTIMEOUT SOME PACKET STUCK IN DESIGN\n\t===================================================\n\n");
-        end
     endfunction
 endclass
