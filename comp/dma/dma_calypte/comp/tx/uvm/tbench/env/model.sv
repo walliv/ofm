@@ -37,21 +37,26 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
     discard #(CHANNELS) m_discard_comp;
 
+    // Counters for all of the channels
     protected int unsigned m_pcie_transactions;
     protected int unsigned m_dma_transactions;
     protected int unsigned m_drop_transactions;
 
+    // Channel specific statisics
     typedef struct{
         int unsigned pcie_transactions;
         int unsigned dma_transactions;
         int unsigned drop_transactions;
+
+        int unsigned dma_transactions_bytes;
+        int unsigned drop_transactions_bytes;
 
         time  infs[string];
 
         logic [8-1:0] memory [2**DATA_POINTER_WIDTH];
     } channel_info_t;
 
-    protected channel_info_t m_channel_info [CHANNELS];
+    channel_info_t m_channel_info [CHANNELS];
 
     function new (string name, uvm_component parent = null);
         super.new(name, parent);
@@ -66,9 +71,11 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
         m_drop_transactions = 0;
 
         for (int unsigned it = 0; it < CHANNELS; it++) begin
-            m_channel_info[it].pcie_transactions = 0;
-            m_channel_info[it].dma_transactions  = 0;
-            m_channel_info[it].drop_transactions = 0;
+            m_channel_info[it].pcie_transactions       = 0;
+            m_channel_info[it].dma_transactions        = 0;
+            m_channel_info[it].drop_transactions       = 0;
+            m_channel_info[it].dma_transactions_bytes  = 0;
+            m_channel_info[it].drop_transactions_bytes = 0;
         end
     endfunction
 
@@ -153,6 +160,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
             m_pcie_transactions++;
             m_channel_info[channel].pcie_transactions++;
+
             debug_msg = "\n";
             debug_msg = { debug_msg, $sformatf("================================================================================= \n")};
             debug_msg = { debug_msg, $sformatf("MODEL INPUT PCIe TRANSACTION %0d\n", m_pcie_transactions)};
@@ -229,7 +237,9 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
                     end
                     usr_tx_meta_tr.item.data = {packet_size, channel, dma_meta};
 
+                    m_dma_transactions++;
                     m_channel_info[channel].dma_transactions++;
+                    m_channel_info[channel].dma_transactions_bytes += packet_size;
 
                     debug_msg = "\n";
                     debug_msg = {debug_msg, $sformatf("================================================================================= \n")};
@@ -249,6 +259,8 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
                     m_usr_meta_analysis_port.write(usr_tx_meta_tr);
                 end else begin
                     m_drop_transactions++;
+                    m_channel_info[channel].drop_transactions++;
+                    m_channel_info[channel].drop_transactions_bytes += packet_size;
 
                     debug_msg = "\n";
                     debug_msg = {debug_msg, $sformatf("================================================================================= \n")};
