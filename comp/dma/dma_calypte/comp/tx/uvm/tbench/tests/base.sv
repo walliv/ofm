@@ -56,18 +56,14 @@ class base extends uvm_test;
                                           CHANNELS, HDR_META_WIDTH, DATA_POINTER_WIDTH, PKT_SIZE_MAX, PCIE_LEN_MAX)::type_id::create("m_env", this);
     endfunction
 
-    // ------------------------------------------------------------------------
-    // Create environment and Run sequences o their sequencers
     virtual task run_phase(uvm_phase phase);
         time time_start;
         virt_seq #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH,
                    CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX) m_virt_seq;
 
-        //CREATE SEQUENCES
         m_virt_seq = virt_seq #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH,
                                 CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX)::type_id::create("m_virt_seq");
 
-        //RISE OBJECTION
         phase.raise_objection(this);
 
         m_virt_seq.init();
@@ -107,5 +103,4 @@ class base extends uvm_test;
     function void report_phase(uvm_phase phase);
         `uvm_info(this.get_full_name(), {"\n\tTEST : ", this.get_type_name(), " END\n"}, UVM_NONE);
     endfunction
-
 endclass
