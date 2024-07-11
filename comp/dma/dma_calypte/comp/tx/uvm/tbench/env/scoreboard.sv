@@ -176,8 +176,8 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     local uvm_common::stats                                                                        m_input_speed;
     local uvm_common::stats                                                                        m_delay;
     local uvm_common::stats                                                                        m_output_speed;
-    local uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))) rx_speed_meter;
-    local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))                               tx_speed_meter;
+    // local uvm_tlm_analysis_fifo #(uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))) rx_speed_meter;
+    // local uvm_tlm_analysis_fifo #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH))                               tx_speed_meter;
 
     // Contructor of scoreboard.
     function new(string name, uvm_component parent);
@@ -187,11 +187,11 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         m_pkt_drop_analysis_export  = new("m_pkt_drop_analysis_export", this);
 
         //LOCAL VARIABLES
-        rx_speed_meter = new("rx_speed_meter", this);
-        tx_speed_meter = new("tx_speed_meter", this);
+        // rx_speed_meter = new("rx_speed_meter", this);
+        // tx_speed_meter = new("tx_speed_meter", this);
         m_delay        = new();
-        m_output_speed = new();
-        m_input_speed  = new();
+        // m_output_speed = new();
+        // m_input_speed  = new();
     endfunction
 
     function int unsigned used();
@@ -220,75 +220,75 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
     function void connect_phase(uvm_phase phase);
         m_pcie_cq_data_subs.port.connect(m_model.m_cq_data_analysis_fifo.analysis_export);
-        m_pcie_cq_data_subs.port.connect(rx_speed_meter.analysis_export);
+        // m_pcie_cq_data_subs.port.connect(rx_speed_meter.analysis_export);
         m_pcie_cq_meta_subs.port.connect(m_model.m_cq_meta_analysis_fifo.analysis_export);
 
         m_model.m_usr_data_analysis_port.connect(m_data_cmp.analysis_imp_model);
         m_model.m_usr_meta_analysis_port.connect(m_meta_cmp.analysis_imp_model);
 
         m_usr_data_analysis_export.connect(m_data_cmp.analysis_imp_dut);
-        m_usr_data_analysis_export.connect(tx_speed_meter.analysis_export);
+        // m_usr_data_analysis_export.connect(tx_speed_meter.analysis_export);
         m_usr_meta_analysis_export.connect(m_meta_cmp.analysis_imp_dut);
         // tr_compare.m_delay = m_delay;
         m_pkt_drop_analysis_export.connect(m_model.m_discard_comp.m_internal_meta_analysis_fifo.analysis_export);
     endfunction
 
-    task run_output();
-        uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH) tr_dut;
+    // task run_output();
+    //     uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH) tr_dut;
 
-        int unsigned speed_packet_size = 0;
-        time         speed_start_time  = 0ns;
+    //     int unsigned speed_packet_size = 0;
+    //     time         speed_start_time  = 0ns;
 
-        forever begin
-            time time_act;
-            time speed_metet_duration;
+    //     forever begin
+    //         time time_act;
+    //         time speed_metet_duration;
 
-            tx_speed_meter.get(tr_dut);
-            time_act = $time();
+    //         tx_speed_meter.get(tr_dut);
+    //         time_act = $time();
 
-            speed_packet_size += tr_dut.data.size();
-            speed_metet_duration = time_act - speed_start_time;
-            if (speed_metet_duration >= 10us) begin
-                real speed;
-                speed =  real'(speed_packet_size) / (speed_metet_duration/1ns); //result is in GB/s
-                m_output_speed.next_val(speed);
-                speed_start_time  = time_act;
-                speed_packet_size = 0;
-                `uvm_info(this.get_full_name(), $sformatf("\n\tCurrent output speed (PCIE TX) is %0.3fGb/s in time [%0d:%0d]us", speed*8, speed_start_time/1us, time_act/1us), UVM_LOW);
-            end
-        end
-    endtask
+    //         speed_packet_size += tr_dut.data.size();
+    //         speed_metet_duration = time_act - speed_start_time;
+    //         if (speed_metet_duration >= 10us) begin
+    //             real speed;
+    //             speed =  real'(speed_packet_size) / (speed_metet_duration/1ns); //result is in GB/s
+    //             m_output_speed.next_val(speed);
+    //             speed_start_time  = time_act;
+    //             speed_packet_size = 0;
+    //             `uvm_info(this.get_full_name(), $sformatf("\n\tCurrent output speed (PCIE TX) is %0.3fGb/s in time [%0d:%0d]us", speed*8, speed_start_time/1us, time_act/1us), UVM_LOW);
+    //         end
+    //     end
+    // endtask
 
-    task run_input();
-        int unsigned speed_packet_size = 0;
-        time         speed_start_time  = 0ns;
+    // task run_input();
+    //     int unsigned speed_packet_size = 0;
+    //     time         speed_start_time  = 0ns;
 
-        forever begin
-            uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)) tr;
-            time time_act;
-            time speed_metet_duration;
-            rx_speed_meter.get(tr);
-            time_act = $time();
+    //     forever begin
+    //         uvm_common::model_item #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH)) tr;
+    //         time time_act;
+    //         time speed_metet_duration;
+    //         rx_speed_meter.get(tr);
+    //         time_act = $time();
 
-            speed_packet_size += tr.item.data.size();
-            speed_metet_duration = time_act - speed_start_time;
-            if (speed_metet_duration >= 10us) begin
-                real speed;
-                speed =  real'(speed_packet_size) / (speed_metet_duration/1ns); //result is in GB/s
-                m_input_speed.next_val(speed);
-                speed_start_time  = time_act;
-                speed_packet_size = 0;
-                `uvm_info(this.get_full_name(), $sformatf("\n\tCurrent input speed (MFB RX) is %0.3fGb/s in time [%0d:%0d]us", speed*8, speed_start_time/1us, time_act/1us), UVM_LOW);
-            end
-        end
-    endtask
+    //         speed_packet_size += tr.item.data.size();
+    //         speed_metet_duration = time_act - speed_start_time;
+    //         if (speed_metet_duration >= 10us) begin
+    //             real speed;
+    //             speed =  real'(speed_packet_size) / (speed_metet_duration/1ns); //result is in GB/s
+    //             m_input_speed.next_val(speed);
+    //             speed_start_time  = time_act;
+    //             speed_packet_size = 0;
+    //             `uvm_info(this.get_full_name(), $sformatf("\n\tCurrent input speed (MFB RX) is %0.3fGb/s in time [%0d:%0d]us", speed*8, speed_start_time/1us, time_act/1us), UVM_LOW);
+    //         end
+    //     end
+    // endtask
 
-    task run_phase(uvm_phase phase);
-        fork
-            run_output();
-            run_input();
-        join_none
-    endtask
+    // task run_phase(uvm_phase phase);
+    //     fork
+    //         run_output();
+    //         run_input();
+    //     join_none
+    // endtask
 
     function void report_phase(uvm_phase phase);
         real min;
@@ -302,10 +302,6 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         if (this.get_report_verbosity_level() >= UVM_LOW) begin
             m_delay.count(min, max, avg, std_dev);
             $swrite(msg, "%s\n\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns", msg, min, max, avg, std_dev, median, modus);
-            m_input_speed.count(min, max, avg, std_dev);
-            $swrite(msg, "%s\n\tSpeed input  statistic (PCIE RX)  => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
-            m_output_speed.count(min, max, avg, std_dev);
-            $swrite(msg, "%s\n\tSpeed output statistic (MFB TX) => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
         end
 
         if (this.used() == 0) begin
