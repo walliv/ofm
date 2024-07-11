@@ -167,9 +167,6 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       m_meta_cmp;
     // compare #(USR_MFB_ITEM_WIDTH, CHANNELS, USR_MFB_META_WIDTH)                                tr_compare;
 
-    local int unsigned m_compared;
-    local int unsigned m_errors;
-
     uvm_reg_data_t pkt_cnt          [CHANNELS];
     uvm_reg_data_t byte_cnt         [CHANNELS];
     uvm_reg_data_t discard_pkt_cnt  [CHANNELS];
@@ -195,8 +192,6 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         m_delay        = new();
         m_output_speed = new();
         m_input_speed  = new();
-        m_compared       = 0;
-        m_errors         = 0;
     endfunction
 
     function int unsigned used();
@@ -304,9 +299,6 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
         real modus;
         string msg = "\n";
 
-        // m_errors   = tr_compare.m_errors;
-        // m_compared = tr_compare.m_compared;
-
         if (this.get_report_verbosity_level() >= UVM_LOW) begin
             m_delay.count(min, max, avg, std_dev);
             $swrite(msg, "%s\n\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns", msg, min, max, avg, std_dev, median, modus);
@@ -316,7 +308,7 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
             $swrite(msg, "%s\n\tSpeed output statistic (MFB TX) => min : %0dGb/s, max : %0dGb/s, average : %0dGb/s, standard deviation : %0dG/s, median : %0dG/s", msg, min*8, max*8, avg*8, std_dev*8, median*8);
         end
 
-        if (m_errors == 0 && this.used() == 0) begin
+        if (this.used() == 0) begin
 
             // $swrite(msg, "%s================================================================================= \n", msg);
             // $swrite(msg, "%s\nEXPORT USED                        \n", msg                                             );
@@ -362,12 +354,9 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
                 $swrite(msg, "%s================================================================================= \n", msg);
             end
 
-            $swrite(msg, "%sCompared packets: %0d", msg, m_compared);
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION SUCCESS      ----\n\t---------------------------------------"}, UVM_NONE)
         end else begin
             string msg = "";
-
-            $swrite(msg, "%sCompared packets: %0d errors %0d", msg, m_compared, m_errors);
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION FAILED       ----\n\t---------------------------------------"}, UVM_NONE)
         end
     endfunction
