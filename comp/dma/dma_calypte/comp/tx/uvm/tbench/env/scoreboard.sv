@@ -290,6 +290,14 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     //     join_none
     // endtask
 
+    function void print_counters(ref string msg, input string cntr_name, int unsigned dut_cntr, int unsigned model_cntr);
+        $swrite(msg, "%s %s\n", msg, cntr_name);
+        $swrite(msg, "%s DUT:   %0d\n", msg, dut_cntr);
+        $swrite(msg, "%s MODEL: %0d\n", msg, model_cntr);
+        $swrite(msg, "%s --------------------\n", msg);
+        $swrite(msg, "%s DIFF:  %0d\n", msg, dut_cntr - model_cntr);
+    endfunction
+
     function void report_phase(uvm_phase phase);
         real min;
         real max;
@@ -301,7 +309,7 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
         if (this.get_report_verbosity_level() >= UVM_LOW) begin
             m_delay.count(min, max, avg, std_dev);
-            $swrite(msg, "%s\n\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns", msg, min, max, avg, std_dev, median, modus);
+            $swrite(msg, "%s\tDelay statistic (SOF to SOF) => min : %0dns, max : %0dns, average : %0dns, standard deviation : %0dns, median : %0dns, modus : %0dns\n", msg, min, max, avg, std_dev, median, modus);
         end
 
         if (this.used() == 0) begin
@@ -317,38 +325,44 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
             for (int chan = 0; chan < CHANNELS; chan++) begin
 
-                // if (byte_cnt[chan] != m_model.cnt_reg[chan].byte_cnt &&
-                //    pkt_cnt[chan]  != m_model.cnt_reg[chan].pkt_cnt) begin
-                //    string msg_1;
-                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, byte_cnt[chan], m_model.cnt_reg[chan].byte_cnt);
-                //    $swrite(msg_1, "%sMODEL BYTE COUNT %d and DUT BYTE COUNT %d\n", msg_1, pkt_cnt[chan], m_model.cnt_reg[chan].pkt_cnt);
-                //    `uvm_error(this.get_full_name(), msg_1);
-                // end
+                $swrite(msg, "%s\n=================================================================================\n", msg);
+                $swrite(msg, "%s CHANNEL %0d\n", msg, chan);
+                $swrite(msg, "%s=================================================================================\n", msg);
 
-                // if (discard_byte_cnt[chan] != m_model.cnt_reg[chan].discard_byte_cnt &&
-                //    discard_pkt_cnt[chan]  != m_model.cnt_reg[chan].discard_pkt_cnt) begin
-                //    string msg_1;
-                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_byte_cnt[chan], m_model.cnt_reg[chan].discard_byte_cnt);
-                //    $swrite(msg_1, "%sMODEL DISCARD BYTE COUNT %d and DUT DISCARD BYTE COUNT %d\n", msg_1, discard_pkt_cnt[chan], m_model.cnt_reg[chan].discard_pkt_cnt);
-                //    `uvm_error(this.get_full_name(), msg_1);
-                // end
+                if (byte_cnt[chan] != m_model.m_channel_info[chan].dma_transactions_bytes &&
+                    pkt_cnt[chan]  != m_model.m_channel_info[chan].dma_transactions &&
+                    discard_byte_cnt[chan] != m_model.m_channel_info[chan].drop_transactions_bytes &&
+                    discard_pkt_cnt[chan]  != m_model.m_channel_info[chan].drop_transactions) begin
 
-                // $swrite(msg, "%s================================================================================= \n", msg);
-                // $swrite(msg, "%s\nMODEL COUNTERS STATISTICS\n", msg                                                       );
-                // $swrite(msg, "%s================================================================================= \n", msg);
-                // $swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.cnt_reg[chan].pkt_cnt                              );
-                // $swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.cnt_reg[chan].byte_cnt                             );
-                // $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.cnt_reg[chan].discard_pkt_cnt                      );
-                // $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.cnt_reg[chan].discard_byte_cnt                     );
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%s\nDUT COUNTERS STATISTICS\n", msg                                                         );
-                $swrite(msg, "%s================================================================================= \n", msg);
-                $swrite(msg, "%sPKT_CNT            %d\n", msg, pkt_cnt[chan]                                              );
-                $swrite(msg, "%sBYTE_CNT           %d\n", msg, byte_cnt[chan]                                             );
-                $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, discard_pkt_cnt[chan]                                      );
-                $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, discard_byte_cnt[chan]                                     );
-                $swrite(msg, "%s================================================================================= \n", msg);
+                    $swrite(msg, "%sPACKET COUNTERS DO NOT EQUAL!\n", msg);
+                end
+
+                if (pkt_cnt[chan]  != m_model.m_channel_info[chan].dma_transactions)
+                    print_counters(msg, "SEND_PACKETS",    pkt_cnt[chan],          m_model.m_channel_info[chan].dma_transactions);
+
+                if (byte_cnt[chan] != m_model.m_channel_info[chan].dma_transactions_bytes)
+                    print_counters(msg, "SEND_BYTES",      byte_cnt[chan],         m_model.m_channel_info[chan].dma_transactions_bytes);
+
+                if (discard_pkt_cnt[chan] != m_model.m_channel_info[chan].drop_transactions)
+                    print_counters(msg, "DISCARD_PACKETS", discard_pkt_cnt[chan],  m_model.m_channel_info[chan].drop_transactions);
+
+                if (discard_byte_cnt[chan] != m_model.m_channel_info[chan].drop_transactions_bytes)
+                    print_counters(msg, "DISCARD_BYTES",   discard_byte_cnt[chan], m_model.m_channel_info[chan].drop_transactions_bytes);
+
+                $swrite(msg, "%s\n----MODEL COUNTERS----\n", msg                                                   );
+                $swrite(msg, "%sPKT_CNT            %d\n", msg, m_model.m_channel_info[chan].dma_transactions       );
+                $swrite(msg, "%sBYTE_CNT           %d\n", msg, m_model.m_channel_info[chan].dma_transactions_bytes );
+                $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, m_model.m_channel_info[chan].drop_transactions      );
+                $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, m_model.m_channel_info[chan].drop_transactions_bytes);
+
+                $swrite(msg, "%s\n----DUT COUNTERS----\n", msg                       );
+                $swrite(msg, "%sPKT_CNT            %d\n", msg, pkt_cnt[chan]         );
+                $swrite(msg, "%sBYTE_CNT           %d\n", msg, byte_cnt[chan]        );
+                $swrite(msg, "%sDISCARD_PKT_CNT    %d\n", msg, discard_pkt_cnt[chan] );
+                $swrite(msg, "%sDISCARD_BYTE_CNT   %d\n", msg, discard_byte_cnt[chan]);
             end
+
+            $swrite(msg, "%s================================================================================= \n", msg);
 
             `uvm_info(get_type_name(), {msg, "\n\n\t---------------------------------------\n\t----     VERIFICATION SUCCESS      ----\n\t---------------------------------------"}, UVM_NONE)
         end else begin
