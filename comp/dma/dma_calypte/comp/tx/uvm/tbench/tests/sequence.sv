@@ -50,10 +50,10 @@ class virt_seq #(
     virtual function void init();
         uvm_mfb::sequence_lib_tx #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH, USR_MFB_META_WIDTH) m_usr_mfb_seq_lib;
 
-        m_reset_seq = uvm_reset::sequence_start::type_id::create("rst_seq");
+        m_reset_seq = uvm_reset::sequence_start::type_id::create("m_reset_seq");
 
         for (int unsigned it = 0; it < CHANNELS; it++) begin
-            m_channel_seq[it] = uvm_tx_dma_calypte::sequence_simple::type_id::create($sformatf("channel_%0d", it));
+            m_channel_seq[it] = uvm_tx_dma_calypte::sequence_simple::type_id::create($sformatf("m_channel_seq_%0d", it));
             m_channel_seq[it].m_packet_size_max = PKT_SIZE_MAX;
         end
 
