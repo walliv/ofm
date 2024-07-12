@@ -44,7 +44,7 @@ proc dma_hdr_deparse {PATH GRP {idx 0} {OFFSET 0}} {
 
 proc int_mfb_meta_deparse {PATH GRP META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_W META_BYTE_CNT_W META_FBE_W META_LBE_W {idx 0} {OFFSET 0} {EN_BYTE_CNT false} {EN_FBE false}} {
     add_wave "-noupdate -group \"$GRP\" -group \"MFB_META_FIELDS $idx\" -label \"raw_signal\" -bin" ${PATH}
-    add_wave "-noupdate -group \"$GRP\" -group \"MFB_META_FIELDS $idx\" -label \"is_dma_hdr\" -bin" ${PATH}($OFFSET)
+    add_wave "-noupdate -group \"$GRP\" -group \"MFB_META_FIELDS $idx\" -color cyan -label \"is_dma_hdr\" -bin" ${PATH}($OFFSET)
     add_wave "-noupdate -group \"$GRP\" -group \"MFB_META_FIELDS $idx\" -label \"pcie_addr\" -hex" ${PATH}([expr $META_PCIE_ADDR_W + $OFFSET]\ downto\ [expr $META_IS_DMA_HDR_W + $OFFSET])
     if {$META_CHAN_NUM_W > 1} {
         add_wave "-noupdate -group \"$GRP\" -group \"MFB_META_FIELDS $idx\" -label \"chan_num\" -unsigned" ${PATH}([expr $META_CHAN_NUM_W + $META_PCIE_ADDR_W + $META_IS_DMA_HDR_W + $OFFSET -1]\ downto\ [expr $META_PCIE_ADDR_W + $META_IS_DMA_HDR_W + $OFFSET])
@@ -158,9 +158,17 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_src_rdy
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_dst_rdy
 
+    add wave -group "INTERNALS" -noupdate -divider "Transaction_buff_input"
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_meta_is_dma_hdr
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_meta_be
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_sof_masked
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_meta_be_masked
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_meta_vld_regions
+    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_data_is_only_dma_hdr
+
     add wave -group "INTERNALS" -noupdate -divider "Transaction_buffer_reading_interface"
     add_wave "-noupdate -group \"INTERNALS\" -unsigned" $PATH/trbuff_rd_chan
-    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/trbuff_rd_data
+    add_wave "-noupdate -group \"INTERNALS\" -hex" $PATH/trbuff_rd_data
     add_wave "-noupdate -group \"INTERNALS\" -hex" $PATH/trbuff_rd_addr
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/trbuff_rd_en
 
