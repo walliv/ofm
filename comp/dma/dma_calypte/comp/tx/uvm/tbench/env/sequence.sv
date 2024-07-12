@@ -16,16 +16,36 @@ class sequence_simple extends uvm_sequence#(uvm_tx_dma_calypte_cq::sequence_item
         super.new(name);
     endfunction
 
-    task body();
-        uvm_common::sequence_cfg m_state;
+    task send_packets(uvm_common::sequence_cfg m_state, int unsigned min, int unsigned max);
+        int unsigned it;
+        int unsigned transaction_count;
 
+        std::randomize(transaction_count) with {
+            transaction_count dist {[1:100] :/ 10, [100:1000] :/ 20, [1000:5000] :/ 60, [5000:50000] :/ 10};
+            transaction_count >= min;
+            transaction_count <= max;
+        };
+
+        //RUN DATA
+        it = 0;
+        while(it < transaction_count && (m_state == null || m_state.next())) begin
+            start_item(req);
+            assert(req.randomize() with {req.m_packet.size() inside {[m_packet_size_min:m_packet_size_max-1]};}) else `uvm_fatal(m_sequencer.get_full_name(), "\n\tCannot randomize packet");
+            finish_item(req);
+
+            it++;
+        end
+    endtask
+
+    task body();
+        uvm_common::sequence_cfg                   m_state;
         uvm_tx_dma_calypte_regs::start_channel_seq m_start_chan_seq;
         uvm_tx_dma_calypte_regs::stop_channel_seq  m_stop_chan_seq;
 
         m_start_chan_seq = uvm_tx_dma_calypte_regs::start_channel_seq::type_id::create("m_start_chan_seq", m_sequencer);
+        m_stop_chan_seq  = uvm_tx_dma_calypte_regs::stop_channel_seq ::type_id::create("m_stop_chan_seq",  m_sequencer);
         m_start_chan_seq.m_regmodel_channel = p_sequencer.m_regmodel_channel;
-        m_stop_chan_seq  = uvm_tx_dma_calypte_regs::stop_channel_seq::type_id::create("m_stop_chan_seq",  m_sequencer);
-        m_stop_chan_seq.m_regmodel_channel = p_sequencer.m_regmodel_channel;
+        m_stop_chan_seq.m_regmodel_channel  = p_sequencer.m_regmodel_channel;
 
         req = uvm_tx_dma_calypte_cq::sequence_item::type_id::create("req", m_sequencer);
 
@@ -34,29 +54,21 @@ class sequence_simple extends uvm_sequence#(uvm_tx_dma_calypte_cq::sequence_item
         end
 
         while(m_state == null || !m_state.stopped()) begin
-            int unsigned wait_fork;
-            int unsigned it;
-            int unsigned transaction_count;
             int unsigned stop_time;
 
-            std::randomize(transaction_count) with {transaction_count dist {[1:100] :/ 10, [100:1000] :/ 20, [1000:5000] :/ 60, [5000:50000] :/ 10}; };
-            std::randomize(stop_time) with {stop_time dist {[1: 10] :/ 10, [10:100] :/ 40, [1000:5000] :/ 5}; };
+            std::randomize(stop_time) with {stop_time dist {[1: 10] :/ 10, [10:100] :/ 40, [1000:5000] :/ 50}; };
 
-            //SLEEP TIME
-            #(stop_time*100ns);
             m_start_chan_seq.start(null);
+            send_packets(m_state, 0, 100000);
 
-            //RUN DATA
-            it = 0;
-            while(it < transaction_count && (m_state == null || m_state.next())) begin
-                start_item(req);
-                assert(req.randomize() with {req.m_packet.size() inside {[m_packet_size_min:m_packet_size_max-1]};}) else `uvm_fatal(m_sequencer.get_full_name(), "\n\tCannot randomize packet");
-                finish_item(req);
+			// TODO: Change verbosity of this
+			`uvm_info(this.get_full_name(), $sformatf("\n\t Stop time will make %0d us", stop_time*0.1), UVM_LOW);
 
-                it++;
-            end
-
-            m_stop_chan_seq.start(null);
+            fork
+                m_stop_chan_seq.start(null);
+                #(stop_time*100ns);
+                send_packets(m_state, 0,200);
+            join
         end
     endtask
 endclass
