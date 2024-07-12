@@ -92,6 +92,8 @@ class virt_seq #(
                     assert(m_channel_seq[index].randomize());
                     m_channel_seq[index].start(p_sequencer.m_packet_sqcr[index]);
                     m_done[index] = 1;
+                    // TODO: change verbosity of this
+                    `uvm_info(this.get_full_name(), $sformatf("\n\t Main packet sequence done on channel %0d", index), UVM_LOW);
                 end
             join_none
         end
