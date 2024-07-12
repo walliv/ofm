@@ -611,20 +611,14 @@ begin
     -- Meeting specific conditions regarding processing of a current packet and channel active
     -- status will cause every packet on the input to be dropped.
     -- =============================================================================================
-    drop_en_p: process(all)
-    begin
-        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
-            pkt_drop_en(i)  <= chan_pkt_drop_en(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i);
-        end loop;
-    end process;
+    pkt_drop_en_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        pkt_drop_en(i)  <= chan_pkt_drop_en(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i);
+    end generate;
 
-    -- Extract usefull data 
-    byte_cnt_ext_p: process(all)
-    begin
-        for i in PCIE_MFB_REGIONS - 1 downto 0 loop
-            pcie_mfb_meta_ext(i)   <= pcie_mfb_meta_arr(i)(META_BE_O + META_BE_W -1 downto 0);
-        end loop;
-    end process;
+    pcie_mfb_meta_ext_g : for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        pcie_mfb_meta_ext(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto 0)   <= pcie_mfb_meta_arr(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto 0);
+        pcie_mfb_meta_ext(i)(META_BE) <= pcie_mfb_meta_arr(i)(META_BE) when pkt_drop_en(i) = '0' else (others => '0');
+    end generate;
 
     pkt_dropper_i : entity work.MFB_DROPPER
         generic map (
