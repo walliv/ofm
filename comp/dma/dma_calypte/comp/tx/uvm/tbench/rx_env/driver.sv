@@ -323,13 +323,12 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
             debug_msg = "\n";
             debug_msg = {debug_msg, "-----------------------------------------------\n"};
-            debug_msg = {debug_msg, $sformatf("PCIe DATA TRANSACTION %0d on channel %0d\n", pcie_trans_cnt, m_channel)};
+            debug_msg = {debug_msg, $sformatf("DRIVER: PCIe DATA TRANSACTION %0d on channel %0d\n", pcie_trans_cnt, m_channel)};
             debug_msg = {debug_msg, "-----------------------------------------------\n"};
             debug_msg = {debug_msg, $sformatf("\tdata_addr 0x%h(%0d)\n", m_ptr.data_addr, m_ptr.data_addr)};
             debug_msg = {debug_msg, $sformatf("\tpcie_addr 0x%h(%0d)\n", pcie_addr, pcie_addr)};
             debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords\n", pcie_len)};
             debug_msg = {debug_msg, $sformatf("\tfbe %b lbe %b\n", fbe, lbe)};
-            debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords\n", pcie_len)};
             debug_msg = {debug_msg, print_data(data)};
             `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
@@ -390,7 +389,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
         debug_msg = "\n";
         debug_msg = {debug_msg, "-----------------------------------------------\n"};
-        debug_msg = {debug_msg, $sformatf("PCIe HEADER TRANSACTION on channel %0d\n", m_channel)};
+        debug_msg = {debug_msg, $sformatf("DRIVER: PCIe HEADER TRANSACTION on channel %0d\n", m_channel)};
         debug_msg = {debug_msg, "-----------------------------------------------\n"};
         debug_msg = {debug_msg, $sformatf("\theader_addr 0x%h(%0d)\n", pcie_addr[DATA_POINTER_WIDTH-1 : 0], pcie_addr[DATA_POINTER_WIDTH-1 : 0])};
         debug_msg = {debug_msg, $sformatf("\theader_num  0x%h(%0d)\n", m_ptr.hdr_addr, m_ptr.hdr_addr)};
@@ -421,7 +420,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
             debug_msg = "\n";
             debug_msg = {debug_msg, "==========================================================\n"};
-            debug_msg = {debug_msg, $sformatf("Send packet to channel %0d\n", m_channel)};
+            debug_msg = {debug_msg, $sformatf("DRIVER: Got sequence item to channel %0d\n", m_channel)};
             debug_msg = {debug_msg, "==========================================================\n"};
             debug_msg = {debug_msg, req.convert2string()};
             `uvm_info(this.get_full_name(), debug_msg, UVM_FULL);
