@@ -612,6 +612,8 @@ begin
     -- status will cause every packet on the input to be dropped.
     -- =============================================================================================
     pkt_drop_en_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+        -- TODO: Mask indication of the DMA header with this signal. When the packet is dropped, the
+        -- is_dma_hdr bit in the metadata is set to 0
         pkt_drop_en(i)  <= chan_pkt_drop_en(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i);
     end generate;
 
