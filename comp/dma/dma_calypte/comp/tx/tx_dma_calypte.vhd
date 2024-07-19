@@ -510,7 +510,7 @@ begin
         fifox_multi_vld_p: process(all) is
         begin
             if st_sp_ctrl_mfb_src_rdy = '1' then 
-                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr;
+                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr and st_sp_ctrl_mfb_sof;
             else 
                 fifox_mult_wr   <= (others => '0');
             end if;
