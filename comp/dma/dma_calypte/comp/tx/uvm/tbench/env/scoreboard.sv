@@ -5,10 +5,10 @@
 
 // SPDX-License-Identifier: BSD-3-Clause
 
-class comparer #(USR_MFB_ITEM_WIDTH) extends uvm_common::comparer_ordered #(uvm_logic_vector_array::sequence_item #(USR_MFB_ITEM_WIDTH));
-    `uvm_component_param_utils(uvm_tx_dma_calypte::comparer #(USR_MFB_ITEM_WIDTH))
+class data_comparer #(ITEM_WIDTH) extends uvm_common::comparer_ordered #(uvm_logic_vector_array::sequence_item #(ITEM_WIDTH));
+    `uvm_component_param_utils(uvm_tx_dma_calypte::data_comparer #(ITEM_WIDTH))
 
-    function new(string name = "uvm_tx_dma_calypte.comparer", uvm_component parent = null);
+    function new(string name = "uvm_tx_dma_calypte.data_comparer", uvm_component parent = null);
         super.new(name, parent);
     endfunction
 
@@ -65,7 +65,7 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH) m_model;
 
     local uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS)                                     m_regmodel_top;
-    comparer #(USR_MFB_ITEM_WIDTH)                                                              m_data_cmp;
+    data_comparer #(USR_MFB_ITEM_WIDTH)                                                         m_data_cmp;
     uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))       m_meta_cmp;
 
     uvm_reg_data_t pkt_cnt          [CHANNELS];
@@ -103,7 +103,7 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
     //build phase
     function void build_phase(uvm_phase phase);
         m_model    = model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, USR_MFB_META_WIDTH)::type_id::create("m_model",    this);
-        m_data_cmp   = comparer #(USR_MFB_ITEM_WIDTH)                                                                     ::type_id::create("m_data_cmp", this);
+        m_data_cmp   = data_comparer #(USR_MFB_ITEM_WIDTH)                                                                ::type_id::create("m_data_cmp", this);
         m_meta_cmp   = uvm_common::comparer_ordered #(uvm_logic_vector::sequence_item #(USR_MFB_META_WIDTH))              ::type_id::create("m_meta_cmp", this);
 
         m_pcie_cq_data_subs = uvm_common::subscriber #(uvm_logic_vector_array::sequence_item #(PCIE_CQ_MFB_ITEM_WIDTH))         ::type_id::create("m_pcie_cq_data_subs",this);
