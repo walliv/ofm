@@ -157,7 +157,10 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
                     discard_byte_cnt[chan] != m_model.m_channel_info[chan].drop_transactions_bytes &&
                     discard_pkt_cnt[chan]  != m_model.m_channel_info[chan].drop_transactions) begin
 
-                    $swrite(msg, "%sPACKET COUNTERS DO NOT EQUAL!\n", msg);
+                    $swrite(msg, "%sPacket counters DO NOT match!\n", msg);
+
+                end else begin
+                    $swrite(msg, "%sPacket counters match!\n", msg);
                 end
 
                 if (pkt_cnt[chan]  != m_model.m_channel_info[chan].dma_transactions)
