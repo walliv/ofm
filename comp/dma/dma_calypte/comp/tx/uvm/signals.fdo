@@ -68,7 +68,12 @@ proc top_input {PATH META_CHAN_NUM_W BUFF_ADDR_W REGIONS} {
     add_wave "-noupdate" $PATH/MI_*
 
     add wave -noupdate -divider "PCIE_CQ_INPUTS"
-    add_wave "-noupdate" $PATH/PCIE_CQ_MFB_DATA
+    if {$REGIONS == 1} {
+        add_wave "-noupdate" $PATH/PCIE_CQ_MFB_DATA
+    } elseif {$REGIONS == 2} {
+        add_wave "-noupdate" $PATH/PCIE_CQ_MFB_DATA(255\ downto\ 0)
+        add_wave "-noupdate" $PATH/PCIE_CQ_MFB_DATA(511\ downto\ 256)
+    }
     pcie_hdr_deparse $PATH/PCIE_CQ_MFB_DATA $META_CHAN_NUM_W $BUFF_ADDR_W 0 ""
     if {$REGIONS == 2} {
         pcie_hdr_deparse $PATH/PCIE_CQ_MFB_DATA $META_CHAN_NUM_W $BUFF_ADDR_W 1 "" 256
@@ -129,11 +134,18 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     add_wave "-noupdate -group \"INTERNALS\" -unsigned" $PATH/pkt_disc_bytes
 
     add wave -group "INTERNALS" -noupdate -divider "Metadata_extractor_outputs"
+    if {$REGIONS == 1} {
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/ext_mfb_data
+    } elseif {$REGIONS == 2} {
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/ext_mfb_data(255\ downto\ 0)
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/ext_mfb_data(511\ downto\ 256)
+    }
+
     int_mfb_meta_deparse $PATH/ext_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 0 0 True
     if {$REGIONS == 2} {
         int_mfb_meta_deparse $PATH/ext_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 1 $META_REDUCED_W True
     }
-    add_wave "-noupdate -group \"INTERNALS\" " $PATH/ext_mfb_data
+
     dma_hdr_deparse $PATH/ext_mfb_data "INTERNALS" 0
     if {$REGIONS == 2} {
         dma_hdr_deparse $PATH/ext_mfb_data "INTERNALS" 1 256
@@ -146,9 +158,13 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/ext_mfb_dst_rdy
 
     add wave -group "INTERNALS" -noupdate -divider "Channel_start_stop_outputs"
-    add_wave "-noupdate -group \"INTERNALS\" " $PATH/st_sp_ctrl_mfb_data
-    int_mfb_meta_deparse $PATH/st_sp_ctrl_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 2
-    if {$REGIONS == 2} {
+    if {$REGIONS == 1} {
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/st_sp_ctrl_mfb_data
+        int_mfb_meta_deparse $PATH/st_sp_ctrl_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 2
+    } elseif {$REGIONS == 2} {
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/st_sp_ctrl_mfb_data(255\ downto\ 0)
+        add_wave "-noupdate -group \"INTERNALS\"" $PATH/st_sp_ctrl_mfb_data(511\ downto\ 256)
+        int_mfb_meta_deparse $PATH/st_sp_ctrl_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 2
         int_mfb_meta_deparse $PATH/st_sp_ctrl_mfb_meta "INTERNALS" $META_IS_DMA_HDR_W $META_PCIE_ADDR_W $META_CHAN_NUM_W $META_BE_W $META_BYTE_CNT_W $META_FBE_W $META_LBE_W 3 $META_WO_BYTE_CNT_W
     }
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_sof
