@@ -121,6 +121,7 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal lbe_decoded           : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(3 downto 0);
 
     signal chan_num_int          : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(max(1, log2(CHANNELS)) -1 downto 0);
+    signal chan_num_stored       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(max(1, log2(CHANNELS)) -1 downto 0);
 
     -- Determines if curently contained payload of the incoming PCIe transaction is a DMA header
     signal is_dma_hdr            : std_logic_vector(PCIE_MFB_REGIONS - 1 downto 0);
@@ -247,25 +248,63 @@ begin
     -- =============================================================================================
     -- Controling split to different channels according to the current PCIe address
     -- =============================================================================================
-    channel_select_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
-        channel_select_p : process (all) is
+    dma_hdr_vld_extract_g: for i in (PCIE_MFB_REGIONS - 1) downto 0 generate
+        dma_hdr_vld_extract_p : process (all) is
         begin
             is_dma_hdr(i)   <= '0';
-            chan_num_int(i) <= (others => '0');
 
             -- NOTE: does not fully work because a different BAR ID has to drop the transaction
-            if PCIE_MFB_SRC_RDY = '1' then 
+            if PCIE_MFB_SRC_RDY = '1' then
                 if PCIE_MFB_SOF(i) = '1' then
                     -- Base address of the first DMA header buffer is always larger by one than the last
                     -- addres for a data buffer in a last channel
                     is_dma_hdr(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1);
-
-                    -- select only the part of the address which indexes DMA channels
-                    chan_num_int(i) <= pcie_addr_masked(i)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
                 end if;
             end if;
         end process;
     end generate;
+
+    -- select only the part of the address which indexes DMA channels
+    chan_num_extract_p : process (all) is
+    begin
+        chan_num_int <= chan_num_stored;
+
+        if (PCIE_MFB_SRC_RDY = '1') then
+            if (PCIE_MFB_SOF = "11") then
+                chan_num_int(0) <= pcie_addr_masked(0)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                chan_num_int(1) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+
+            elsif (PCIE_MFB_SOF = "01") then
+                chan_num_int(0) <= pcie_addr_masked(0)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                chan_num_int(1) <= pcie_addr_masked(0)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+
+            elsif (PCIE_MFB_SOF = "10") then
+                chan_num_int(1) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+
+            end if;
+        end if;
+    end process;
+
+    -- purpose: store the number of channel for the duration of the whole packet
+    channel_store_reg_p: process (CLK) is
+    begin
+        if (rising_edge(CLK)) then
+            if (PCIE_MFB_SRC_RDY = '1') then
+                if (PCIE_MFB_SOF = "11") then
+                    chan_num_stored(0) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                    chan_num_stored(1) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                elsif (PCIE_MFB_SOF = "01") then
+                    chan_num_stored(0) <= pcie_addr_masked(0)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                    chan_num_stored(1) <= pcie_addr_masked(0)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+
+                elsif (PCIE_MFB_SOF = "10") then
+                    chan_num_stored(0) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+                    chan_num_stored(1) <= pcie_addr_masked(1)(log2(CHANNELS) + POINTER_WIDTH + 1 -1 downto POINTER_WIDTH + 1);
+
+                end if;
+            end if;
+        end if;
+    end process;
 
     byte_en_decoder_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
         byte_en_decoder_i : entity work.PCIE_BYTE_EN_DECODER
