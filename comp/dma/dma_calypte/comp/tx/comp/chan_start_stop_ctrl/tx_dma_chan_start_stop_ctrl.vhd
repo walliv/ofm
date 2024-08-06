@@ -222,7 +222,19 @@ architecture FULL of TX_DMA_CHAN_START_STOP_CTRL is
     signal pcie_mfb_meta_ext        : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(META_BE_O + META_BE_W -1 downto 0);
 
 begin
+
+    -- =============================================================================================
+    -- Verification specific connections and for ILA debugger
+    -- =============================================================================================
     -- assert (fifo_full_reg = '0') report "TX_DMA_CHAN_START_STOP_CTRL: FIFOX_MULTI OVERFLOW!" severity Failure;
+    --
+    -- Signal for verfication
+    -- ver_reg_p: process(CLK)
+    -- begin
+    --     if rising_edge(CLK) then
+    --         fifo_full_reg <= fifox_mult_full;
+    --     end if;
+    -- end process;
 
     -- Debug signal for one region
     stop_req_while_pending_ored <= or stop_req_while_pending;
@@ -431,7 +443,7 @@ begin
                 case pkt_acc_pst(j) is
                     -- This process is looking for SOF so that it can move to another state
                     -- The state it moves to is based on channel activity
-                    when S_IDLE         =>
+                    when S_IDLE =>
                         if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
 
                             -- 2) 4) 6)
@@ -439,7 +451,7 @@ begin
                                 pkt_acc_nst(j)      <= S_PKT_PENDING;
                             else
                                 pkt_acc_nst(j)      <= S_PKT_DROP;
-                                chan_pkt_drop_en(j) <= pcie_mfb_sof_arr(j);
+                                chan_pkt_drop_en(j) <= "11";
                             end if;
 
                             -- 7)
@@ -484,31 +496,34 @@ begin
                     -- This process is looking for DMA header so it can move to S_IDLE
                     -- But there's a catch - There could be combination 8) 
                     -- Then we move to S_PKT_PENDING or S_PKT_DROP based on channel activity
-                    when S_PKT_DROP     =>
-                        if ((PCIE_MFB_SRC_RDY = '1') and ((or pcie_mfb_sof_arr(j)) = '1')) then 
+                    when S_PKT_DROP =>
+                        chan_pkt_drop_en(j) <= "11";
+                        if (PCIE_MFB_SRC_RDY = '1') then
 
-                            chan_pkt_drop_en(j) <= pcie_mfb_sof_arr(j);
+
+                            if ((or pcie_mfb_sof_arr(j)) = '1') then
                             
-                            -- 8)
-                            -- DMA header is in the first region - we must check if there's start of new transaction
-                            if (is_dma_hdr_arr(j)(0) = '1') then
-                                if (pcie_mfb_sof_arr(j)(1) = '1') then
-                                    if (channel_active_pst(j) = CHANNEL_RUNNING) then
-                                        pkt_acc_nst(j)          <= S_PKT_PENDING;
-                                        chan_pkt_drop_en(j)(1)  <= '0';
+                                -- 8)
+                                -- DMA header is in the first region - we must check if there's start of new transaction
+                                if (is_dma_hdr_arr(j)(0) = '1') then
+                                    if (pcie_mfb_sof_arr(j)(1) = '1') then
+                                        if (channel_active_pst(j) = CHANNEL_RUNNING) then
+                                            pkt_acc_nst(j)          <= S_PKT_PENDING;
+                                            chan_pkt_drop_en(j)(1)  <= '0';
+                                        else
+                                            pkt_acc_nst(j)          <= S_PKT_DROP;
+                                        end if;
                                     else
-                                        pkt_acc_nst(j)          <= S_PKT_DROP;
-                                    end if;                                    
-                                else
-                                    -- 5)
+                                        -- 5)
+                                        pkt_acc_nst(j)      <= S_IDLE;
+                                    end if;
+                                end if;
+
+                                -- 3) 7) 9)
+                                -- DMA header is in the second region - always move to S_IDLE
+                                if (is_dma_hdr_arr(j)(1) = '1') then
                                     pkt_acc_nst(j)      <= S_IDLE;
                                 end if;
-                            end if;
-
-                            -- 3) 7) 9)
-                            -- DMA header is in the second region - always move to S_IDLE
-                            if (is_dma_hdr_arr(j)(1) = '1') then
-                                pkt_acc_nst(j)      <= S_IDLE;
                             end if;
                         end if;
                 end case;
@@ -595,14 +610,6 @@ begin
                 PKT_DISC_INC    <= '0';
             end if;
         end process;
-
-        -- Signal for verfication
-        ver_reg_p: process(CLK)
-        begin
-            if rising_edge(CLK) then 
-                fifo_full_reg <= fifox_mult_full;
-            end if;
-        end process;
     end generate;
 
     -- =============================================================================================
@@ -612,14 +619,13 @@ begin
     -- status will cause every packet on the input to be dropped.
     -- =============================================================================================
     pkt_drop_en_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
-        -- TODO: Mask indication of the DMA header with this signal. When the packet is dropped, the
-        -- is_dma_hdr bit in the metadata is set to 0
         pkt_drop_en(i)  <= chan_pkt_drop_en(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i);
     end generate;
 
     pcie_mfb_meta_ext_g : for i in PCIE_MFB_REGIONS - 1 downto 0 generate
-        pcie_mfb_meta_ext(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto 0)   <= pcie_mfb_meta_arr(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto 0);
-        pcie_mfb_meta_ext(i)(META_BE) <= pcie_mfb_meta_arr(i)(META_BE) when pkt_drop_en(i) = '0' else (others => '0');
+        pcie_mfb_meta_ext(i)(META_IS_DMA_HDR)                                               <= pcie_mfb_meta_arr(i)(META_IS_DMA_HDR) when pkt_drop_en(i) = '0' else (others => '0');
+        pcie_mfb_meta_ext(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_IS_DMA_HDR_W) <= pcie_mfb_meta_arr(i)(META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_IS_DMA_HDR_W);
+        pcie_mfb_meta_ext(i)(META_BE)                                                       <= pcie_mfb_meta_arr(i)(META_BE_O + META_BE_W -1 downto META_BE_O) when pkt_drop_en(i) = '0' else (others => '0');
     end generate;
 
     pkt_dropper_i : entity work.MFB_DROPPER
@@ -628,8 +634,7 @@ begin
             REGION_SIZE => PCIE_MFB_REGION_SIZE,
             BLOCK_SIZE  => PCIE_MFB_BLOCK_SIZE,
             ITEM_WIDTH  => PCIE_MFB_ITEM_WIDTH,
-            META_WIDTH  => ((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1)
-        )
+            META_WIDTH  => ((PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH)/8+log2(CHANNELS)+62+1))
         port map (
             CLK   => CLK,
             RESET => RESET,
@@ -651,6 +656,5 @@ begin
             TX_SOF     => USR_MFB_SOF,
             TX_EOF     => USR_MFB_EOF,
             TX_SRC_RDY => USR_MFB_SRC_RDY,
-            TX_DST_RDY => USR_MFB_DST_RDY
-        );
+            TX_DST_RDY => USR_MFB_DST_RDY);
 end architecture;
