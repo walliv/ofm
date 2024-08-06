@@ -401,13 +401,15 @@ begin
     be_fill_p : process (all) is
     begin
         -- default assignment is to simply copy the validity value of the current item
-        for i in 0 to PCIE_MFB_REGIONS - 1 loop 
-            for j in 0 to (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1) loop
-                mfb_aux_item_be(i)(j) <= (others => mfb_aux_item_vld_int_arr(i)(j));
-            end loop;
-        end loop;
+        mfb_aux_item_be <= (others => (others => (others => '0')));
 
         if (aux_mfb_src_rdy = '1') then
+            for i in 0 to PCIE_MFB_REGIONS - 1 loop
+                for j in 0 to (PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE -1) loop
+                    mfb_aux_item_be(i)(j) <= (others => mfb_aux_item_vld_int_arr(i)(j));
+                end loop;
+            end loop;
+
             -- apply FBE to the BE vector
             for i in 0 to PCIE_MFB_REGIONS - 1 loop 
                 if (aux_mfb_sof(i) = '1') then
