@@ -185,13 +185,18 @@ begin
     -- =============================================================================================
     assert_dma_hdr_check_p: process (all) is
         constant NULL_VECT : std_logic_vector(META_BE_W -1 downto 0) := (others => '0');
+        variable pcie_mfb_meta_arr_v : slv_array_t(MFB_REGIONS -1 downto 0)(META_BE_O + META_BE_W -1 downto 0);
     begin
+        pcie_mfb_meta_arr_v := slv_array_deser(PCIE_MFB_META, MFB_REGIONS);
+
         if rising_edge(CLK) then
             for i in 0 to (MFB_REGIONS -1) loop
-                if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1' and pcie_mfb_meta_arr(i)(META_BE) /= NULL_VECT) then
-                    assert (pcie_mfb_meta_arr(i)(META_IS_DMA_HDR) = "0")
-                        report "TX_DMA_PCIE_TRANS_BUFFER: captured DMA header on region " & to_string(i) & "! Danger of data overwrite!"
-                        severity FAILURE;
+                if (RESET = '0') then
+                    if (PCIE_MFB_SRC_RDY = '1' or pcie_mfb_meta_arr_v(i)(META_BE) /= NULL_VECT) then
+                        assert (pcie_mfb_meta_arr_v(i)(META_IS_DMA_HDR) = "0")
+                            report "TX_DMA_PCIE_TRANS_BUFFER: captured DMA header on region " & to_string(i) & "! Danger of data overwrite!"
+                            severity FAILURE;
+                    end if;
                 end if;
             end loop;
         end if;
