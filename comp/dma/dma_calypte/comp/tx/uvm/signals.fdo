@@ -338,6 +338,7 @@ proc meta_extractor {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W MET
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/fbe_decoded
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/lbe_decoded
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/chan_num_int
+    add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/chan_num_stored
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/is_dma_hdr
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/pcie_tr_byte_cnt
 
