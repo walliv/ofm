@@ -23,9 +23,9 @@ class data_comparer #(ITEM_WIDTH) extends uvm_common::comparer_ordered #(uvm_log
         $swrite(msg, "%s\n\tWRONG_BYTES:\n",  msg);
 
         if (tr_model.item.size() != tr_dut.in_item.size()) begin
-            $write(msg, "%s\tTransaction lengths do not match: MODEL: %0d, DUT: %0d\n. Unable to compare!\n", msg, tr_model.item.data.size(), tr_dut.in_item.data.size());
+            $write(msg, "%s\tTransaction lengths match: NO (MODEL: %0d, DUT: %0d)\n. Unable to compare!\n", msg, tr_model.item.data.size(), tr_dut.in_item.data.size());
         end else begin
-            msg = $sformatf("%s\tTransaction lengths do match!\n", msg);
+            msg = $sformatf("%s\tTransaction lengths match: YES\n", msg);
             msg = $sformatf("%s\t", msg);
            
             foreach (tr_dut.in_item.data[it]) begin
