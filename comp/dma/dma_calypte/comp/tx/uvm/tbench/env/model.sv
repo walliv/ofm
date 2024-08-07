@@ -175,7 +175,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
             debug_msg = { debug_msg, $sformatf("LBE         : %b\n", dword_cnt > 1 ? cq_meta_tr.item.data[171-1 : 167] : cq_meta_tr.item.data[167-1 : 163])};
             debug_msg = { debug_msg, $sformatf("DATA        : %s\n", cq_data_tr.convert2string())};
             debug_msg = { debug_msg, $sformatf("================================================================================= \n")};
-            `uvm_info(this.get_full_name(), debug_msg, UVM_FULL);
+            `uvm_info(this.get_full_name(), debug_msg, UVM_MEDIUM);
 
             //if PCIE transaction is not DMA HEADER
             if (hdr_inf == 1'b0) begin
@@ -253,7 +253,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
                     debug_msg = {debug_msg, $sformatf("OUT META: %s\n", usr_tx_meta_tr.convert2string())};
                     debug_msg = {debug_msg, $sformatf("OUT DATA: %s\n", usr_tx_data_tr.convert2string())};
                     debug_msg = {debug_msg, $sformatf("================================================================================= \n")};
-                    `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH)
+                    `uvm_info(this.get_full_name(), debug_msg, UVM_MEDIUM)
 
                     m_usr_data_analysis_port.write(usr_tx_data_tr);
                     m_usr_meta_analysis_port.write(usr_tx_meta_tr);
@@ -274,7 +274,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
                     debug_msg = {debug_msg, $sformatf("OUT META: %s\n", usr_tx_meta_tr.convert2string())};
                     debug_msg = {debug_msg, $sformatf("OUT DATA: %s\n", usr_tx_data_tr.convert2string())};
                     debug_msg = {debug_msg, $sformatf("================================================================================= \n")};
-                    `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH)
+                    `uvm_info(this.get_full_name(), debug_msg, UVM_MEDIUM)
                 end
 
                 m_channel_info[channel].infs.delete();
