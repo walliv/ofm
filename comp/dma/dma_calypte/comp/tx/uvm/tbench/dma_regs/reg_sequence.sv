@@ -80,16 +80,13 @@ class stop_channel_seq extends uvm_sequence;
             hw_data = data;
             m_regmodel_channel.hw_hdr_pointer_reg .read(status, data, .parent(this));
             hw_hdr = data;
-        end while (sw_data != hw_data || sw_hdr != hw_hdr);
 
-        do begin
-            #(300ns)
             m_regmodel_channel.status_reg.read(status, data, .parent(this));
             stop_attempts++;
 
             assert (stop_attempts < 500) else
                 `uvm_fatal(this.get_type_name(), "\n\nThe stop of a channel takes suspiciously long time!\n")
-           
-        end while ((data & 32'h1) != 0);
+
+        end while (sw_data != hw_data || sw_hdr != hw_hdr || (data & 32'h1) != 0);
     endtask
 endclass
