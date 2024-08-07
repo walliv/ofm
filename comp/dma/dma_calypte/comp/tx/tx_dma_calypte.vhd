@@ -272,7 +272,6 @@ architecture FULL of TX_DMA_CALYPTE is
     signal mfb_meta_be_masked              : slv_array_t(PCIE_CQ_MFB_REGIONS -1 downto 0)(META_BE_W-1 downto 0);
     signal mfb_meta_new                    : slv_array_t(PCIE_CQ_MFB_REGIONS -1 downto 0)(META_BE_W+META_BE_O-1 downto 0);
     signal mfb_meta_vld_regions            : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
-    signal mfb_data_is_only_dma_hdr        : std_logic;
 
     -- fifox_multi support
     signal st_sp_ctrl_mfb_meta_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)((META_BE_W + META_BE_O) -1 downto 0);
@@ -459,16 +458,12 @@ begin
         st_sp_ctrl_mfb_sof_masked(i)                                   <= '0'             when st_sp_ctrl_mfb_meta_is_dma_hdr(i) = '1' else st_sp_ctrl_mfb_sof(i);
         -- Mask byte enable when there is a DMA header in a current region
         mfb_meta_be_masked(i)                                          <= (others => '0') when st_sp_ctrl_mfb_meta_is_dma_hdr(i) = '1' else st_sp_ctrl_mfb_meta_arr(i)(META_BE);
-        -- Return masked byte enable back to the original signal
-        mfb_meta_new(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto 0) <= st_sp_ctrl_mfb_meta_arr(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto 0);
+        -- Return masked byte enable back and assign IS_DMA_HDR bit permanently to 0
+        mfb_meta_new(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto 0) <= st_sp_ctrl_mfb_meta_arr(i)(META_CHAN_NUM_W + META_CHAN_NUM_O -1 downto META_IS_DMA_HDR_W) & '0';
         mfb_meta_new(i)(META_BE)                                       <= mfb_meta_be_masked(i);
         -- only lower 4 bits are sufficient to determine the validity of a region
-        mfb_meta_vld_regions(i)                                        <= or (st_sp_ctrl_mfb_meta_be(i)(3 downto 0));
+        mfb_meta_vld_regions(i)                                        <= (or (st_sp_ctrl_mfb_meta_be(i)(3 downto 0))) and (not st_sp_ctrl_mfb_meta_is_dma_hdr(i));
     end generate;
-
-    -- This signal is set to 1 if the current word contains only DMA headers in at least one of its
-    -- regions and no data in all other regions.
-    mfb_data_is_only_dma_hdr <= (or mfb_meta_vld_regions) and (and (mfb_meta_vld_regions xnor st_sp_ctrl_mfb_meta_is_dma_hdr));
 
     st_sp_ctrl_mfb_meta_w_be_masked <= slv_array_ser(mfb_meta_new);
 
@@ -490,7 +485,7 @@ begin
             PCIE_MFB_DATA    => st_sp_ctrl_mfb_data,
             PCIE_MFB_META    => st_sp_ctrl_mfb_meta_w_be_masked,
             PCIE_MFB_SOF     => st_sp_ctrl_mfb_sof_masked,
-            PCIE_MFB_SRC_RDY => st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_dst_rdy and (not mfb_data_is_only_dma_hdr),
+            PCIE_MFB_SRC_RDY => (or mfb_meta_vld_regions) and st_sp_ctrl_mfb_src_rdy,
 
             RD_CHAN     => trbuff_rd_chan,
             RD_DATA     => trbuff_rd_data,
@@ -510,7 +505,7 @@ begin
         fifox_multi_vld_p: process(all) is
         begin
             if st_sp_ctrl_mfb_src_rdy = '1' then 
-                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr and st_sp_ctrl_mfb_sof;
+                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr;
             else 
                 fifox_mult_wr   <= (others => '0');
             end if;
