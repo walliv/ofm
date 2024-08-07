@@ -180,7 +180,6 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/st_sp_ctrl_mfb_sof_masked
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_meta_be_masked
     add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_meta_vld_regions
-    add_wave "-noupdate -group \"INTERNALS\" -bin" $PATH/mfb_data_is_only_dma_hdr
 
     add wave -group "INTERNALS" -noupdate -divider "Transaction_buffer_reading_interface"
     add_wave "-noupdate -group \"INTERNALS\" -unsigned" $PATH/trbuff_rd_chan
