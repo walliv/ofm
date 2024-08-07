@@ -164,7 +164,7 @@ begin
 
         case pkt_dispatch_pst is
             when S_IDLE =>
-                if (HDR_BUFF_SRC_RDY = '1' and ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
+                if (HDR_BUFF_SRC_RDY = '1') then -- and ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '1') then
                     pkt_dispatch_nst <= S_PKT_BEGIN;
                 end if;
 
@@ -218,16 +218,17 @@ begin
 
                 -- Change to common signal
                 if (HDR_BUFF_SRC_RDY = '1') then
-                    if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '0') then
-                        -- NOTE: this was previously USR_MFB_DST_RDY
-                        HDR_BUFF_DST_RDY <= '1';
-                    else
+                    -- NOTE: Leave this here because this appeared from the testing in hardware and
+                    -- not from the verification.
+                    -- if (ENABLED_CHANS(to_integer(unsigned(HDR_BUFF_CHAN))) = '0') then
+                    --     HDR_BUFF_DST_RDY <= '1';
+                    -- else
                         addr_cntr_nst <= dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range) + (USR_MFB_DATA'length /8);
                         byte_cntr_nst <= resize(dma_hdr_frame_length_v, byte_cntr_nst'length);
 
                         BUFF_RD_ADDR <= std_logic_vector(dma_hdr_frame_ptr_v(BUFF_RD_ADDR'range));
                         BUFF_RD_EN <= '1';
-                    end if;
+                    -- end if;
                 end if;
 
             when S_PKT_BEGIN =>
