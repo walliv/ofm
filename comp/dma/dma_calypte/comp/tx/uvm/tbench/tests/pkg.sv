@@ -40,7 +40,7 @@ package test;
     parameter DMA_HDR_POINTER_WIDTH   = 11;
 
     // Max size bytes of DMA frame
-    parameter PKT_SIZE_MAX            = 2**11;
+    parameter PKT_SIZE_MAX            = 2**9;
     // Parameters that set min and max size of PCIE transaction
     parameter PCIE_LEN_MAX            = 256;
 
