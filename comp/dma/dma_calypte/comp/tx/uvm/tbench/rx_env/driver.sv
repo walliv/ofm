@@ -73,6 +73,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     localparam PACKET_ALIGNMENT = 32;
 
     driver_sync #(MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_data_export;
+    uvm_reset::sync_terminate                                            m_reset_terminate;
 
     local uvm_tx_dma_calypte_regs::regmodel_channel m_regmodel_channel;
     local driver_data                               m_driv_data;
@@ -88,6 +89,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     // Constructor
     function new(string name, uvm_component parent);
         super.new(name, parent);
+        m_reset_terminate = new();
     endfunction
 
     task ptr_read(uvm_reg register, output logic [16-1:0] ptr);
@@ -197,10 +199,11 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         //     mask   = m_driv_data.hdr_mask;
         // end
 
+        debug_msg = "\n";
+        debug_msg = {debug_msg, $sformatf("\twait_for_free_space method:\n")};
+
         if (m_driv_data.chan_active_reg != 0) begin
 
-            debug_msg = "\n";
-            debug_msg = {debug_msg, $sformatf("\twait_for_free_space method:\n")};
             debug_msg = {debug_msg, $sformatf("\tRequested space: %0d\n", requested_space)};
 
             if (is_hdr == 0) begin
@@ -236,9 +239,16 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             else
                 m_driv_data.hdr_free_space = free_space;
 
-            debug_msg = {debug_msg, $sformatf("\tFree space in the end: %0d\n", free_space)};
-            `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
+        end else begin
+            // If the channel is inactive, then assign the maximum free space so the packets can be send.
+            if (is_hdr == 0)
+                m_driv_data.data_free_space = m_driv_data.data_mask;
+            else
+                m_driv_data.hdr_free_space  = m_driv_data.hdr_mask;
         end
+
+        debug_msg = {debug_msg, $sformatf("\tFree space in the end: %0d\n", free_space)};
+        `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
     endtask
 
     function pcie_info create_pcie_req(logic [64-1 : 0] pcie_addr, logic [11-1 : 0] pcie_len, logic [4-1:0] fbe, logic [4-1:0] lbe, logic[MFB_ITEM_WIDTH-1:0] data[]);
@@ -547,6 +557,15 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     endtask
 
     task run_phase(uvm_phase phase);
+
+        // Initial wait for the reset to drop
+        wait(m_reset_terminate.is_reset() == 1);
+        // TODO: This needs a more refinement since it does not wait
+        // until the reset actually drops in the waveforms.
+        while(m_reset_terminate.has_been_reset() == 1)
+            #(10ns);
+
+        // Read masks of pointers in the beginning.
         ptr_read(m_regmodel_channel.data_mask_reg, m_driv_data.data_mask);
         ptr_read(m_regmodel_channel.hdr_mask_reg , m_driv_data.hdr_mask);
 
@@ -575,7 +594,9 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             packet_ptr = m_driv_data.data_addr;
 
             send_data();
+
             send_header(packet_ptr);
+
             seq_item_port.item_done();
         end
     endtask

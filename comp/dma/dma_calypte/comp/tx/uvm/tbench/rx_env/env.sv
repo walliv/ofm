@@ -79,6 +79,7 @@ class env #(DEVICE, MFB_REGIONS, MFB_REGION_SIZE, MFB_BLOCK_SIZE, MFB_ITEM_WIDTH
                 m_driver[chan].seq_item_port.connect(m_sequencer[chan].seq_item_export);
                 m_driver[chan].m_data_export = m_data_export;
                 m_reset_sync.push_back(m_sequencer[chan].m_reset_sync);
+                m_reset_sync.push_back(m_driver[chan].m_reset_terminate);
             end
         end
     endfunction
