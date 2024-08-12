@@ -32,7 +32,7 @@ package test;
     parameter PCIE_CC_MFB_BLOCK_SIZE  = 8;
     parameter PCIE_CC_MFB_ITEM_WIDTH  = 32;
 
-    parameter CHANNELS                = 2;
+    parameter CHANNELS                = 4;
     parameter CNTRS_WIDTH             = 64;
     parameter HDR_META_WIDTH          = 24;
 

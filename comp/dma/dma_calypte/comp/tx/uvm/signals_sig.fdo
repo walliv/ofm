@@ -13,7 +13,7 @@ add_wave "-noupdate -color yellow -label RESET"   /testbench/DUT_U/VHDL_DUT_U/RE
 puts "==============================================="
 puts "Wave parameters:"
 puts "==============================================="
-set CHANNELS 2
+set CHANNELS 4
 set BUFF_SIZE 16384
 set REGIONS 2
 
