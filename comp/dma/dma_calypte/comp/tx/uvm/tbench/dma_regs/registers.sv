@@ -86,6 +86,33 @@ class pointer_register extends uvm_reg;
     endfunction
 endclass
 
+class pointer_mask_register extends uvm_reg;
+    `uvm_object_utils(uvm_tx_dma_calypte_regs::pointer_mask_register)
+
+    // Write
+    rand uvm_reg_field pointer;
+
+    function new(string name = "pointer_mask_register");
+        super.new(name, 16, UVM_NO_COVERAGE);
+    endfunction
+
+    virtual function void build();
+        //Create fields
+        pointer = uvm_reg_field::type_id::create("pointer_mask");
+        //Configure
+        pointer.configure(this, // Parent
+                         16   , // Number of bits
+                         0  , // LSB
+                         "RO", // Access
+                         0   , // Volatility
+                         0   , // Value on reset
+                         0   , // Can the value be reset?
+                         0   , // Can the value be randomized?
+                         0     // Does the field occupy an entire byte lane?
+                         );
+    endfunction
+endclass
+
 class cnt_register extends uvm_reg;
     `uvm_object_utils(uvm_tx_dma_calypte_regs::cnt_register)
 
