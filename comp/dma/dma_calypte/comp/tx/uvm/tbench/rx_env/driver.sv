@@ -12,9 +12,19 @@ class driver_data;
     logic [16-1 : 0] data_addr;
     logic [16-1 : 0] data_mask;
 
+	// THe parameter m_chan_active_flag is to retain the send of DMA header in case a
+	// channel is shut down during the send of this data. If it would not be there,
+	// the DMA header would not be send and the transaction with it dropped leaving
+	// the channel in an incomplete stop state.
+    logic [16-1 : 0] chan_active_reg;
+
+    int unsigned data_free_space;
+    int unsigned hdr_free_space;
+
     function new();
         hdr_addr  = 0;
         data_addr = 0;
+        chan_active_reg = 0;
     endfunction
 endclass
 
@@ -65,7 +75,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     driver_sync #(MFB_ITEM_WIDTH, sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) m_data_export;
 
     local uvm_tx_dma_calypte_regs::regmodel_channel m_regmodel_channel;
-    local driver_data                               m_ptr;
+    local driver_data                               m_driv_data;
     int unsigned                                    m_channel;
 
     typedef struct{
@@ -162,43 +172,71 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     function void regmodel_set(uvm_tx_dma_calypte_regs::regmodel_channel m_regmodel);
         status_cbs cbs;
 
-        this.m_ptr = new();
-        cbs = new(this.m_ptr);
+        this.m_driv_data = new();
+        cbs = new(this.m_driv_data);
         this.m_regmodel_channel = m_regmodel;
-
         uvm_reg_field_cb::add(this.m_regmodel_channel.control_reg.dma_enable, cbs);
     endfunction
 
-    task wait_for_free_space(int unsigned space, uvm_reg hw_reg, logic[16-1:0] sw_addr, logic[16-1:0] mask, bit chan_active);
-        int unsigned   free_space;
+    task wait_for_free_space(int unsigned requested_space, bit is_hdr);
         logic [16-1:0] hw_ptr;
+        //logic [16-1:0] sw_ptr;
+        //logic [16-1:0] mask;
         string         debug_msg;
+        //uvm_reg        hw_reg;
+        int unsigned   free_space;
 
-        if (chan_active != 0) begin
+        // if (is_hdr == 0) begin
+        //     hw_reg = m_regmodel_channel.hw_data_pointer_reg;
+        //     sw_ptr = m_driv_data.data_addr;
+        //     mask   = m_driv_data.data_mask;
+
+        // end else begin
+        //     hw_reg = m_regmodel_channel.hw_hdr_pointer_reg;
+        //     sw_ptr = m_driv_data.hdr_addr;
+        //     mask   = m_driv_data.hdr_mask;
+        // end
+
+        if (m_driv_data.chan_active_reg != 0) begin
 
             debug_msg = "\n";
             debug_msg = {debug_msg, $sformatf("\twait_for_free_space method:\n")};
-            debug_msg = {debug_msg, $sformatf("\tRequested space: %0d\n", space)};
-            debug_msg = {debug_msg, $sformatf("\tInput sw address: 0x%h (%d)\n", sw_addr, sw_addr)};
-            debug_msg = {debug_msg, $sformatf("\tInput mask: 0x%h\n", mask)};
+            debug_msg = {debug_msg, $sformatf("\tRequested space: %0d\n", requested_space)};
 
-            ptr_read(hw_reg, hw_ptr);
-            debug_msg = {debug_msg, $sformatf("\thw_ptr in the beginning: 0x%h (%d)\n", hw_ptr, hw_ptr)};
-            free_space = (hw_ptr-1 - sw_addr) & mask;
-            debug_msg = {debug_msg, $sformatf("\tFree space in the beginning: %0d\n", free_space)};
-            while(free_space < space) begin
-                #(200ns)
-                ptr_read(hw_reg, hw_ptr);
-                debug_msg = {debug_msg, $sformatf("\thw_ptr in the loop: 0x%h (%d)\n", hw_ptr, hw_ptr)};
-                free_space = (hw_ptr-1 - sw_addr) & mask;
-                debug_msg = {debug_msg, $sformatf("\tFree space in the loop: %0d\n", free_space)};
-                debug_msg = {debug_msg, $sformatf("\tsw address in loop: 0x%h (%d)\n", sw_addr, sw_addr)};
-                debug_msg = {debug_msg, $sformatf("\tmask in loop: 0x%h\n", mask)};
+            if (is_hdr == 0) begin
+                debug_msg = {debug_msg, $sformatf("\tInput sw address: 0x%h (%d)\n", m_driv_data.data_addr, m_driv_data.data_addr)};
+                ptr_read(m_regmodel_channel.hw_data_pointer_reg, hw_ptr);
+                debug_msg = {debug_msg, $sformatf("\thw_ptr in the beginning: 0x%h (%d)\n", hw_ptr, hw_ptr)};
+                free_space = (hw_ptr-1 - m_driv_data.data_addr) & m_driv_data.data_mask;
+            end else begin
+                debug_msg = {debug_msg, $sformatf("\tInput sw address: 0x%h (%d)\n", m_driv_data.hdr_addr, m_driv_data.hdr_addr)};
+                ptr_read(m_regmodel_channel.hw_hdr_pointer_reg, hw_ptr);
+                debug_msg = {debug_msg, $sformatf("\thw_ptr in the beginning: 0x%h (%d)\n", hw_ptr, hw_ptr)};
+                free_space = (hw_ptr-1 - m_driv_data.hdr_addr)  & m_driv_data.hdr_mask;
             end
 
+            debug_msg = {debug_msg, $sformatf("\tFree space in the beginning: %0d\n", free_space)};
+
+            while(free_space < requested_space) begin
+                #(200ns)
+                if (is_hdr == 0) begin
+                    ptr_read(m_regmodel_channel.hw_data_pointer_reg, hw_ptr);
+                    debug_msg = {debug_msg, $sformatf("\thw_ptr in the loop: 0x%h (%d)\n", hw_ptr, hw_ptr)};
+                    free_space = (hw_ptr-1 - m_driv_data.data_addr) & m_driv_data.data_mask;
+                end else begin
+                    ptr_read(m_regmodel_channel.hw_hdr_pointer_reg, hw_ptr);
+                    debug_msg = {debug_msg, $sformatf("\thw_ptr in the loop: 0x%h (%d)\n", hw_ptr, hw_ptr)};
+                    free_space = (hw_ptr-1 - m_driv_data.hdr_addr)  & m_driv_data.hdr_mask;
+                end
+                debug_msg = {debug_msg, $sformatf("\tFree space in the loop: %0d\n", free_space)};
+            end
+
+            if (is_hdr == 0)
+                m_driv_data.data_free_space = free_space;
+            else
+                m_driv_data.hdr_free_space = free_space;
+
             debug_msg = {debug_msg, $sformatf("\tFree space in the end: %0d\n", free_space)};
-            debug_msg = {debug_msg, $sformatf("\tOutput sw address: 0x%h\n", sw_addr)};
-            debug_msg = {debug_msg, $sformatf("\tOutput mask: 0x%h\n", mask)};
             `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
         end
     endtask
@@ -207,8 +245,8 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         pcie_info ret;
         logic [PCIE_HDR_SIZE-1:0] pcie_hdr;
 
-        ret.data      = uvm_logic_vector_array::sequence_item#(MFB_ITEM_WIDTH)::type_id::create("pcie_tr.data");
-        ret.meta      = uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)::type_id::create("pcie_tr.meta");
+        ret.data = uvm_logic_vector_array::sequence_item#(MFB_ITEM_WIDTH)::type_id::create("pcie_tr.data");
+        ret.meta = uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)::type_id::create("pcie_tr.meta");
 
         pcie_hdr = '0;
         ret.size = pcie_len;
@@ -256,24 +294,19 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         return ret;
     endfunction
 
-	// THe parameter chan_active_flag is to retain the send of DMA header in case a
-	// channel is shut down during the send of this data. If it would not be there,
-	// the DMA header would not be send and the transaction with it dropped leaving
-	// the channel in an incomplete stop state.
-    task send_data(output logic chan_active_flag);
+    task send_data();
         pcie_info pcie_transactions[$];
-        int unsigned packet_index;
+        int unsigned packet_byte_cntr;
         int unsigned pcie_len;
         logic [MFB_ITEM_WIDTH-1 : 0]  data[];
 
         logic [MFB_ITEM_WIDTH/8-1:0]  fbe;
-        logic [MFB_ITEM_WIDTH/8-1:0]  lbe = '0; //fbe is negative last fbe
+        logic [MFB_ITEM_WIDTH/8-1:0]  lbe = '0;
         logic [MFB_ITEM_WIDTH/8-1:0]  send_lbe = '0; // if pcie transaction have one dword then lbe is set to zero
 
         const int unsigned packet_len = (req.m_packet.size()+(MFB_ITEM_WIDTH/8-1))/(MFB_ITEM_WIDTH/8); //len in Dwords (rounded up, meaning the last DW has not to be full)
 
         int unsigned pcie_trans_cnt;
-        bit          chan_active;
         string       debug_msg;
 
         debug_msg = "\n";
@@ -282,13 +315,15 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         debug_msg = {debug_msg, $sformatf("DRIVER: Transaction of length %0d B (%0d DW) on channel %0d\n", req.m_packet.size(), packet_len, m_channel)};
         debug_msg = {debug_msg,           "----------------------------------------------------------------\n"};
 
-        packet_index = 0;
+        packet_byte_cntr = 0;
         pcie_trans_cnt = 0;
         pcie_transactions.delete();
 
         //////////////////////////////////
         // DATA SEND
-        while (packet_index < req.m_packet.size()) begin
+        //
+        // Iterates over the packet data and creates PCIE transactions from them
+        while (packet_byte_cntr < req.m_packet.size()) begin
 
             int unsigned data_index;
             logic [64-1 : 0] pcie_addr;
@@ -301,15 +336,16 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             end
 
             debug_msg = {debug_msg, "\n"};
-            debug_msg = {debug_msg, $sformatf("\tPCIE Transaction length: %0d\n", pcie_len)};
+            debug_msg = {debug_msg, $sformatf("\tPointer mask: 0x%h\n", m_driv_data.data_mask)};
+            debug_msg = {debug_msg, $sformatf("\tPCIE Transaction length: %0d DW\n", pcie_len)};
             debug_msg = {debug_msg, $sformatf("\tLast LBE: %b\n", lbe)};
 
             fbe = lbe_to_fbe(lbe);
             debug_msg = {debug_msg, $sformatf("\tDerived next FBE: %b\n", fbe)};
 
-            if (packet_len <= (packet_index/(MFB_ITEM_WIDTH/8) + pcie_len)) begin
-                pcie_len = packet_len - packet_index/(MFB_ITEM_WIDTH/8);
-                lbe      = decode_lbe(req.m_packet.size() % ((MFB_ITEM_WIDTH/8)));
+            if (packet_len <= (packet_byte_cntr/(MFB_ITEM_WIDTH/8) + pcie_len)) begin
+                pcie_len = packet_len - packet_byte_cntr/(MFB_ITEM_WIDTH/8);
+                lbe      = decode_lbe(req.m_packet.size() % (MFB_ITEM_WIDTH/8));
             end else begin
                 assert(std::randomize(lbe) with {
                         if (pcie_len == 1){
@@ -321,6 +357,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
                         }
                     }) else `uvm_fatal(this.get_full_name(), "\n\tCannot randomize lbe");
             end
+
             debug_msg = {debug_msg, $sformatf("\tRemaining transaction length: %0d\n", pcie_len)};
             debug_msg = {debug_msg, $sformatf("\tCalculated LBE: %b\n", lbe)};
 
@@ -328,41 +365,46 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             data = new[pcie_len];
             data_index = 0;
             void'(std::randomize(data[0]));
+
             if (pcie_len > 1) begin
                 void'(std::randomize(data[pcie_len-1]));
+
                 //pealing FBE
                 for (int unsigned jt = this.encode_fbe(fbe); jt < MFB_ITEM_WIDTH/8; jt++) begin
-                    data[0][(jt+1)*8-1 -: 8] = req.m_packet[packet_index + data_index];
+                    data[0][(jt+1)*8-1 -: 8] = req.m_packet[packet_byte_cntr + data_index];
                     data_index++;
                 end
 
                 //Except first and last PCI WORD
                 for (int unsigned it = 1; it < pcie_len-1; it++) begin
-                    data[it] = { << 8 {req.m_packet[packet_index + data_index +: MFB_ITEM_WIDTH/8]}};
+                    data[it] = { << 8 {req.m_packet[packet_byte_cntr + data_index +: MFB_ITEM_WIDTH/8]}};
                     data_index += MFB_ITEM_WIDTH/8;
                 end
 
                 //pealing LBE
                 for (int unsigned jt = 0; jt < this.encode_lbe(lbe); jt++) begin
-                    data[pcie_len-1][(jt+1)*8-1 -: 8] = req.m_packet[packet_index + data_index];
+                    data[pcie_len-1][(jt+1)*8-1 -: 8] = req.m_packet[packet_byte_cntr + data_index];
                     data_index++;
                 end
+
                 send_lbe = lbe;
             end else begin
                 for (int unsigned jt = this.encode_fbe(fbe); jt < this.encode_lbe(lbe); jt++) begin
-                    data[0][(jt+1)*8-1 -: 8] = req.m_packet[packet_index + data_index];
+                    data[0][(jt+1)*8-1 -: 8] = req.m_packet[packet_byte_cntr + data_index];
                     data_index++;
                 end
+
                 fbe &= lbe;
                 send_lbe = 0;
             end
-            debug_msg = {debug_msg, $sformatf("\tOld packet index: %0d\n", packet_index)};
-            packet_index += data_index;
+
+            debug_msg = {debug_msg, $sformatf("\tOld byte cntr: %0d\n", packet_byte_cntr)};
+            packet_byte_cntr += data_index;
             debug_msg = {debug_msg, $sformatf("\tData index: %0d\n", data_index)};
-            debug_msg = {debug_msg, $sformatf("\tNew packet index: %0d\n", packet_index)};
+            debug_msg = {debug_msg, $sformatf("\tNew byte cntr: %0d\n", packet_byte_cntr)};
 
             pcie_addr = '0;
-            pcie_addr[DATA_POINTER_WIDTH-1 : 0] = m_ptr.data_addr; // Address is in bytes
+            pcie_addr[DATA_POINTER_WIDTH-1 : 0] = m_driv_data.data_addr; // Address is in bytes
             pcie_addr[(DATA_POINTER_WIDTH+1+$clog2(CHANNELS))-1 : DATA_POINTER_WIDTH+1] = m_channel;
             pcie_addr[(DATA_POINTER_WIDTH+$clog2(CHANNELS)+1)] = 1'b0;
             pcie_transactions.push_back(create_pcie_req(pcie_addr, pcie_len, fbe, send_lbe, data));
@@ -371,64 +413,77 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, "-----------------------------------------------\n"};
             debug_msg = {debug_msg, $sformatf("DRIVER: PCIe DATA TRANSACTION %0d on channel %0d\n", pcie_trans_cnt, m_channel)};
             debug_msg = {debug_msg, "-----------------------------------------------\n"};
-            debug_msg = {debug_msg, $sformatf("\tdata_addr 0x%h(%0d)\n", m_ptr.data_addr, m_ptr.data_addr)};
+            debug_msg = {debug_msg, $sformatf("\tdata_addr 0x%h(%0d)\n", m_driv_data.data_addr, m_driv_data.data_addr)};
             debug_msg = {debug_msg, $sformatf("\tpcie_addr 0x%h(%0d)\n", pcie_addr, pcie_addr)};
+            debug_msg = {debug_msg, $sformatf("\tpcie_addr 0x%h(%0d) - CUTOUT\n", pcie_addr[DATA_POINTER_WIDTH-1 : 2], pcie_addr[DATA_POINTER_WIDTH-1 : 2])};
             debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords\n", pcie_len)};
             debug_msg = {debug_msg, $sformatf("\tfbe %b lbe %b\n", fbe, lbe)};
             debug_msg = {debug_msg, print_data(data)};
 
             debug_msg = {debug_msg, "\n"};
 
-            m_ptr.data_addr = (m_ptr.data_addr + data_index) & m_ptr.data_mask;
-            debug_msg = {debug_msg, $sformatf("New data ptr: 0x%h\n", m_ptr.data_addr)};
+            m_driv_data.data_addr = (m_driv_data.data_addr + data_index) & m_driv_data.data_mask;
+            debug_msg = {debug_msg, $sformatf("New data ptr: 0x%h\n", m_driv_data.data_addr)};
             pcie_trans_cnt++;
 
-            `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
         end
 
-        ptr_read(m_regmodel_channel.control_reg, chan_active);
-        // This is assigned to the output to pass the value of the active channel to the send_header task.
-        // So the pointers of the header transactions are updated.
-        chan_active_flag = chan_active;
+        ptr_read(m_regmodel_channel.control_reg, m_driv_data.chan_active_reg);
+
+        debug_msg = {debug_msg, $sformatf("Chan active: 0x%h \n", m_driv_data.chan_active_reg)};
 
         //SHUFLE AND SEND DATA
-        pcie_transactions.shuffle();
+        // pcie_transactions.shuffle();
         for (int unsigned it = 0; it < pcie_transactions.size(); it++) begin
-            wait_for_free_space(pcie_transactions[it].size*(MFB_ITEM_WIDTH/8), m_regmodel_channel.hw_data_pointer_reg, m_ptr.data_addr, m_ptr.data_mask, chan_active);
+            int trans_size = pcie_transactions[it].size*(MFB_ITEM_WIDTH/8);
+            debug_msg = {debug_msg, $sformatf("Putting transaction of size: %0d (free space: %0d)\n", trans_size, m_driv_data.data_free_space)};
+
+            if (m_driv_data.data_free_space < trans_size) begin
+                wait_for_free_space(trans_size, 0);
+                debug_msg = {debug_msg, $sformatf("New free space after read: %0d\n", m_driv_data.data_free_space)};
+            end
+
             m_data_export.put(m_channel, pcie_transactions[it].meta, pcie_transactions[it].data);
+            m_driv_data.data_free_space -= trans_size;
         end
 
         debug_msg = {debug_msg, "\n"};
 
         //Allign pointer to PACKET ALLIGMENT
-        if ((m_ptr.data_addr % PACKET_ALIGNMENT) != 0) begin
+        if ((m_driv_data.data_addr % PACKET_ALIGNMENT) != 0) begin
             int unsigned size_to_allign;
 
-            debug_msg = {debug_msg, $sformatf("\t Realigning ptr: 0x%h\n", m_ptr.data_addr)};
-            debug_msg = {debug_msg, $sformatf("\t Ptr mask: %h\n", m_ptr.data_mask)};
-            size_to_allign = (PACKET_ALIGNMENT-(m_ptr.data_addr % PACKET_ALIGNMENT));
+            debug_msg = {debug_msg, $sformatf("\t Realigning ptr: 0x%h (free_space: %0d)\n", m_driv_data.data_addr, m_driv_data.data_free_space)};
+            debug_msg = {debug_msg, $sformatf("\t Ptr mask: %h\n", m_driv_data.data_mask)};
+            size_to_allign = (PACKET_ALIGNMENT-(m_driv_data.data_addr % PACKET_ALIGNMENT));
             debug_msg = {debug_msg, $sformatf("\t Remaining size to align: %0d (0x%h)\n", size_to_allign, size_to_allign)};
-            debug_msg = {debug_msg, $sformatf("\t Pointer: 0x%h\n", m_ptr.data_addr)};
-            wait_for_free_space(size_to_allign, m_regmodel_channel.hw_data_pointer_reg, m_ptr.data_addr, m_ptr.data_mask, chan_active);
-            debug_msg = {debug_msg, $sformatf("\t Remaining size to align: %0d (0x%h)\n", size_to_allign, size_to_allign)};
-            debug_msg = {debug_msg, $sformatf("\t Pointer: 0x%h\n", m_ptr.data_addr)};
 
-            m_ptr.data_addr = (m_ptr.data_addr + size_to_allign) & m_ptr.data_mask;
-            debug_msg = {debug_msg, $sformatf("\t Ptr after alignment: 0x%h\n", m_ptr.data_addr)};
+            if (m_driv_data.data_free_space < size_to_allign)
+                wait_for_free_space(size_to_allign, 0);
+
+            m_driv_data.data_addr = (m_driv_data.data_addr + size_to_allign) & m_driv_data.data_mask;
+            m_driv_data.data_free_space -= size_to_allign;
+            debug_msg = {debug_msg, $sformatf("\t Ptr after alignment: 0x%h (free_space: %0d)\n", m_driv_data.data_addr, m_driv_data.data_free_space)};
         end
 
-        debug_msg = {debug_msg, $sformatf("\t Ptr mask: %h\n", m_ptr.data_mask)};
-        debug_msg = {debug_msg, $sformatf("\t Ptr after alignment: 0x%h\n", m_ptr.data_addr)};
         `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
-        if (chan_active != 0)
-            ptr_write(m_regmodel_channel.sw_data_pointer_reg, m_ptr.data_addr);
+        if (m_driv_data.chan_active_reg != 0)
+            ptr_write(m_regmodel_channel.sw_data_pointer_reg, m_driv_data.data_addr);
+
+        // --------------------------------------------------------------
+        // Parameter checks
+        // --------------------------------------------------------------
+        if (m_driv_data.data_free_space > m_driv_data.data_mask)
+            `uvm_fatal(this.get_full_name(), $sformatf("\n\t DATA: The free space counter has an invalid value: %0d", m_driv_data.data_free_space));
+
+
     endtask
 
 	// parameter allow_ptr_update is handed from the send_data function called
 	// previously and it allows to send a DMA header when the channel gets a stop
 	// request during packet reception
-    task send_header(logic [16-1:0] packet_ptr, bit allow_ptr_update);
+    task send_header(logic [16-1:0] packet_ptr);
         pcie_info pcie_transaction;
         int unsigned              pcie_len;
         logic [4-1:0]             fbe;
@@ -436,7 +491,6 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         logic [DMA_HDR_SIZE-1:0]  dma_hdr;
         logic [64-1 : 0]          pcie_addr;
         string debug_msg;
-        bit    chan_active;
 
         //////////////////////////////////
         // DMA HEADER
@@ -451,7 +505,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         dma_hdr[63 : 40] = req.m_meta;
 
         pcie_addr = '0;
-        pcie_addr[DATA_POINTER_WIDTH-1 : 0] = m_ptr.hdr_addr*2*(MFB_ITEM_WIDTH/8); //Address is in DMA headers (64B)
+        pcie_addr[DATA_POINTER_WIDTH-1 : 0] = m_driv_data.hdr_addr*2*(MFB_ITEM_WIDTH/8); //Address is in DMA headers (64B)
         pcie_addr[(DATA_POINTER_WIDTH+1+$clog2(CHANNELS))-1 : DATA_POINTER_WIDTH+1] = m_channel;
         pcie_addr[(DATA_POINTER_WIDTH+$clog2(CHANNELS)+1)] = 1'b1;
         pcie_transaction = create_pcie_req(pcie_addr, pcie_len, fbe, lbe, {dma_hdr[31 : 0], dma_hdr[63 : 32]});
@@ -461,33 +515,47 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         debug_msg = {debug_msg, $sformatf("DRIVER: PCIe HEADER TRANSACTION on channel %0d\n", m_channel)};
         debug_msg = {debug_msg, "-----------------------------------------------\n"};
         debug_msg = {debug_msg, $sformatf("\theader_addr 0x%h(%0d)\n", pcie_addr[DATA_POINTER_WIDTH-1 : 0], pcie_addr[DATA_POINTER_WIDTH-1 : 0])};
-        debug_msg = {debug_msg, $sformatf("\theader_num  0x%h(%0d)\n", m_ptr.hdr_addr, m_ptr.hdr_addr)};
+        debug_msg = {debug_msg, $sformatf("\theader_num  0x%h(%0d)\n", m_driv_data.hdr_addr, m_driv_data.hdr_addr)};
         debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords\n", pcie_len)};
-        debug_msg = {debug_msg, $sformatf("\tfbe %h fbe %h\n", fbe, lbe)};
+        debug_msg = {debug_msg, $sformatf("\tfbe %b fbe %b\n", fbe, lbe)};
         debug_msg = {debug_msg, $sformatf("\tpacket size    %0dB\n", req.m_packet.size())};
-        debug_msg = {debug_msg, $sformatf("\tpacket pointer %0dB\n", packet_ptr)};
+        debug_msg = {debug_msg, $sformatf("\tpacket pointer 0x%h (%0d)\n", packet_ptr, packet_ptr)};
         debug_msg = {debug_msg, $sformatf("\tmeta %h\n", req.m_meta)};
         `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
         //SEND DATA
-        ptr_read(m_regmodel_channel.control_reg, chan_active);
-        wait_for_free_space(1, m_regmodel_channel.hw_hdr_pointer_reg, m_ptr.hdr_addr, m_ptr.hdr_mask, chan_active | allow_ptr_update);
+        // ptr_read(m_regmodel_channel.control_reg, chan_active);
+        if (m_driv_data.hdr_free_space == 0)
+            wait_for_free_space(1, 1);
+
         m_data_export.put(m_channel, pcie_transaction.meta, pcie_transaction.data);
 
         //move hdr pointer
-        m_ptr.hdr_addr += 1;
-        m_ptr.hdr_addr &= m_ptr.hdr_mask;
+        m_driv_data.hdr_addr += 1;
+        m_driv_data.hdr_addr &= m_driv_data.hdr_mask;
+        m_driv_data.hdr_free_space -= 1;
 
         //actualize sdp_pointer
-        if (chan_active != 0 || allow_ptr_update == 1)
-            ptr_write(m_regmodel_channel.sw_hdr_pointer_reg, m_ptr.hdr_addr);
+        if (m_driv_data.chan_active_reg != 0)
+            ptr_write(m_regmodel_channel.sw_hdr_pointer_reg, m_driv_data.hdr_addr);
+
+        // --------------------------------------------------------------
+        // Parameter checks
+        // --------------------------------------------------------------
+        if (m_driv_data.hdr_free_space > m_driv_data.hdr_mask)
+            `uvm_fatal(this.get_full_name(), $sformatf("\n\t HDR: The free space counter has an invalid value: %0d", m_driv_data.hdr_free_space));
     endtask
 
     task run_phase(uvm_phase phase);
+        ptr_read(m_regmodel_channel.data_mask_reg, m_driv_data.data_mask);
+        ptr_read(m_regmodel_channel.hdr_mask_reg , m_driv_data.hdr_mask);
+
+        m_driv_data.data_free_space = m_driv_data.data_mask;
+        m_driv_data.hdr_free_space  = m_driv_data.hdr_mask;
+
         forever begin
             logic [16-1:0] packet_ptr;
             string debug_msg;
-            bit    chan_active_flag;
 
             seq_item_port.get_next_item(req);
 
@@ -496,16 +564,18 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, $sformatf("DRIVER: Got sequence item to channel %0d\n", m_channel)};
             debug_msg = {debug_msg, "==========================================================\n"};
             debug_msg = {debug_msg, req.convert2string()};
-            `uvm_info(this.get_full_name(), debug_msg, UVM_FULL);
 
-            ptr_read(m_regmodel_channel.data_mask_reg, m_ptr.data_mask);
-            ptr_read(m_regmodel_channel.hdr_mask_reg , m_ptr.hdr_mask);
+            //ptr_read(m_regmodel_channel.data_mask_reg, m_driv_data.data_mask);
+            debug_msg = {debug_msg, $sformatf("\n\n\tRead data pointer mask:   0x%h\n", m_driv_data.data_mask)};
+            //ptr_read(m_regmodel_channel.hdr_mask_reg , m_driv_data.hdr_mask);
+            debug_msg = {debug_msg, $sformatf("\tRead header pointer mask: 0x%h\n", m_driv_data.hdr_mask)};
+            `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
             //align start of packet to PACKET_ALIGMENT
-            packet_ptr = m_ptr.data_addr;
+            packet_ptr = m_driv_data.data_addr;
 
-            send_data(chan_active_flag);
-            send_header(packet_ptr, chan_active_flag);
+            send_data();
+            send_header(packet_ptr);
             seq_item_port.item_done();
         end
     endtask
