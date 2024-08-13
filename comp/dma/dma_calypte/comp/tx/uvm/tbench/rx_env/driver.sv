@@ -6,6 +6,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 class driver_data;
+
+    logic     status_wait;
+    semaphore status_sem;
+
     logic [16-1 : 0] hdr_addr;
     logic [16-1 : 0] hdr_mask;
 
@@ -22,26 +26,39 @@ class driver_data;
     int unsigned hdr_free_space;
 
     function new();
+        status_wait = 0;
+        status_sem  = new(1);
         hdr_addr  = 0;
         data_addr = 0;
         chan_active_reg = 0;
     endfunction
 endclass
 
-// class status_cbs extends uvm_reg_cbs;
-//     driver_data data;
+class status_cbs extends uvm_reg_cbs;
+    driver_data data;
 
-//     function new(driver_data data);
-//         this.data = data;
-//     endfunction
+    function new(driver_data data);
+        this.data = data;
+    endfunction
 
-//     virtual task pre_write(uvm_reg_item rw);
-//         if(rw.value[0][0] == 1'b1) begin
-//             data.hdr_addr  = 0;
-//             data.data_addr = 0;
-//         end
-//     endtask
-// endclass
+    virtual task pre_write(uvm_reg_item rw);
+        if(rw.value[0][0] == 1'b1) begin
+            data.status_wait = 1;
+            data.status_sem.get();
+
+            data.hdr_addr  = 0;
+            data.data_addr = 0;
+        end
+    endtask
+
+    virtual task post_write(uvm_reg_item rw);
+        if(rw.value[0][0] == 1'b1) begin
+            data.status_wait = 0;
+            data.status_sem.put();
+        end
+    endtask
+
+endclass
 
 class driver_sync #(MFB_ITEM_WIDTH, MFB_META_WIDTH);
 
@@ -600,13 +617,16 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, $sformatf("\tRead header pointer mask: 0x%h\n", m_driv_data.hdr_mask)};
             `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
+            //check for
+            wait(m_driv_data.status_wait == 0);
+            m_driv_data.status_sem.get();
+
             //align start of packet to PACKET_ALIGMENT
             packet_ptr = m_driv_data.data_addr;
-
             send_data();
-
             send_header(packet_ptr);
 
+            m_driv_data.status_sem.put();
             seq_item_port.item_done();
         end
     endtask
