@@ -28,20 +28,20 @@ class driver_data;
     endfunction
 endclass
 
-class status_cbs extends uvm_reg_cbs;
-    driver_data data;
+// class status_cbs extends uvm_reg_cbs;
+//     driver_data data;
 
-    function new(driver_data data);
-        this.data = data;
-    endfunction
+//     function new(driver_data data);
+//         this.data = data;
+//     endfunction
 
-    virtual task pre_write(uvm_reg_item rw);
-        if(rw.value[0][0] == 1'b1) begin
-            data.hdr_addr  = 0;
-            data.data_addr = 0;
-        end
-    endtask
-endclass
+//     virtual task pre_write(uvm_reg_item rw);
+//         if(rw.value[0][0] == 1'b1) begin
+//             data.hdr_addr  = 0;
+//             data.data_addr = 0;
+//         end
+//     endtask
+// endclass
 
 class driver_sync #(MFB_ITEM_WIDTH, MFB_META_WIDTH);
 
@@ -172,12 +172,12 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     endfunction
 
     function void regmodel_set(uvm_tx_dma_calypte_regs::regmodel_channel m_regmodel);
-        status_cbs cbs;
+        // status_cbs cbs;
 
         this.m_driv_data = new();
-        cbs = new(this.m_driv_data);
+        // cbs = new(this.m_driv_data);
         this.m_regmodel_channel = m_regmodel;
-        uvm_reg_field_cb::add(this.m_regmodel_channel.control_reg.dma_enable, cbs);
+        // uvm_reg_field_cb::add(this.m_regmodel_channel.control_reg.dma_enable, cbs);
     endfunction
 
     task wait_for_free_space(int unsigned requested_space, bit is_hdr);
@@ -348,6 +348,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             end
 
             debug_msg = {debug_msg, "\n"};
+            debug_msg = {debug_msg, $sformatf("\tPointer for transaction: 0x%h\n", pcie_trans_ptr)};
             debug_msg = {debug_msg, $sformatf("\tPointer mask: 0x%h\n", m_driv_data.data_mask)};
             debug_msg = {debug_msg, $sformatf("\tPCIE Transaction length: %0d DW\n", pcie_len)};
             debug_msg = {debug_msg, $sformatf("\tLast LBE: %b\n", lbe)};
@@ -438,12 +439,20 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             pcie_trans_cnt++;
         end
 
-        ptr_read(m_regmodel_channel.control_reg, m_driv_data.chan_active_reg);
-
+        // Figure out if the channel is active to determine if the update of pointer and check of free
+        // space needs to be issued.
+        ptr_read(m_regmodel_channel.status_reg, m_driv_data.chan_active_reg);
         debug_msg = {debug_msg, $sformatf("\tChan active: 0x%h \n", m_driv_data.chan_active_reg)};
 
         //SHUFLE AND SEND DATA
         // pcie_transactions.shuffle();
+
+        // while (it < pcie_transactions.size()) begin
+
+        //     pcie_transactions[it].size*(MFB_ITEM_WIDTH/8)
+
+        // end
+
         for (int unsigned it = 0; it < pcie_transactions.size(); it++) begin
             int trans_size = pcie_transactions[it].size*(MFB_ITEM_WIDTH/8);
             debug_msg = {debug_msg, $sformatf("\tPutting transaction of size: %0d (free space: %0d)\n", trans_size, m_driv_data.data_free_space)};
@@ -489,13 +498,11 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         // --------------------------------------------------------------
         if (m_driv_data.data_free_space > m_driv_data.data_mask)
             `uvm_fatal(this.get_full_name(), $sformatf("\n\tDATA: The free space counter has an invalid value: %0d", m_driv_data.data_free_space));
-
-
     endtask
 
-	// parameter allow_ptr_update is handed from the send_data function called
-	// previously and it allows to send a DMA header when the channel gets a stop
-	// request during packet reception
+    // parameter allow_ptr_update is handed from the send_data function called
+    // previously and it allows to send a DMA header when the channel gets a stop
+    // request during packet reception
     task send_header(logic [16-1:0] packet_ptr);
         pcie_info pcie_transaction;
         int unsigned              pcie_len;
