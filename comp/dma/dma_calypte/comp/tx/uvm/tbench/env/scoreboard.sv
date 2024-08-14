@@ -89,9 +89,9 @@ class scoreboard #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_PO
 
     function int unsigned used();
         int unsigned ret = 0;
-        ret |= m_model.used() != 0;
-        ret |= m_data_cmp.used() != 0;
-        ret |= m_meta_cmp.used() != 0;
+        ret |= (m_model.used() != 0);
+        ret |= (m_data_cmp.used() != 0);
+        ret |= (m_meta_cmp.used() != 0);
         return ret;
     endfunction
 
