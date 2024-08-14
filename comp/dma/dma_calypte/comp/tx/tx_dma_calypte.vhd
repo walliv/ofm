@@ -285,24 +285,22 @@ architecture FULL of TX_DMA_CALYPTE is
 
 begin
 
-    -- assert (USR_TX_MFB_REGIONS = 1 and USR_TX_MFB_REGION_SIZE = 4 and USR_TX_MFB_BLOCK_SIZE = 8 and USR_TX_MFB_ITEM_WIDTH = 8)
-    --     report "TX_DMA_CALYPTE: unsupported USR_TX_MFB configuration, the alowed are: (1,4,8,8)"
-    --     severity FAILURE;
+    assert (
+        (USR_TX_MFB_REGIONS = 1 and USR_TX_MFB_REGION_SIZE = 4 and USR_TX_MFB_BLOCK_SIZE = 8 and USR_TX_MFB_ITEM_WIDTH = 8) or
+        (USR_TX_MFB_REGIONS = 1 and USR_TX_MFB_REGION_SIZE = 8 and USR_TX_MFB_BLOCK_SIZE = 8 and USR_TX_MFB_ITEM_WIDTH = 8)
+        )
+        report "TX_DMA_CALYPTE: unsupported USR_TX_MFB configuration, the alowed are: (1,4,8,8), (1,8,8,8)"
+        severity FAILURE;
 
-    -- assert (PCIE_CQ_MFB_REGIONS = 1 and PCIE_CQ_MFB_REGION_SIZE = 1 and PCIE_CQ_MFB_BLOCK_SIZE = 8 and PCIE_CQ_MFB_ITEM_WIDTH = 32)
-    --     report "TX_DMA_CALYPTE: unsupported PCIE_CQ_MFB configuration, the allowed are: (1,1,8,32)"
-    --     severity FAILURE;
-
-    -- assert (DEVICE = "ULTRASCALE")
-    --     report "TX_DMA_CALYPTE: unsupported device type, the allowed are: ULTRASCALE"
-    --     severity FAILURE;
+    assert (
+        (PCIE_CQ_MFB_REGIONS = 1 and PCIE_CQ_MFB_REGION_SIZE = 1 and PCIE_CQ_MFB_BLOCK_SIZE = 8 and PCIE_CQ_MFB_ITEM_WIDTH = 32) or
+        (PCIE_CQ_MFB_REGIONS = 2 and PCIE_CQ_MFB_REGION_SIZE = 1 and PCIE_CQ_MFB_BLOCK_SIZE = 8 and PCIE_CQ_MFB_ITEM_WIDTH = 32)
+        )
+        report "TX_DMA_CALYPTE: unsupported PCIE_CQ_MFB configuration, the allowed are: (1,1,8,32), (2,1,8,32)"
+        severity FAILURE;
 
     assert (PKT_SIZE_MAX <= 2**DATA_POINTER_WIDTH)
         report "TX_DMA_CALYPTE: too large PKT_SIZE_MAX, the internal buffer must be able to fit at least one packet of the size of the PKT_SIZE_MAX. Either change DATA_POINTER_WIDTH or PKT_SIZE_MAX generic."
-        severity FAILURE;
-
-    assert (DMA_HDR_POINTER_WIDTH <= DATA_POINTER_WIDTH)
-        report "TX_DMA_CALYPTE: The width of the data pointer should be equal or greater than the width of the header pointer"
         severity FAILURE;
 
     assert (DMA_HDR_POINTER_WIDTH + 3 = DATA_POINTER_WIDTH)
