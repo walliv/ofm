@@ -14,7 +14,7 @@ puts "==============================================="
 puts "Wave parameters:"
 puts "==============================================="
 set CHANNELS 4
-set BUFF_SIZE 16384
+set BUFF_SIZE 8192
 set REGIONS 2
 
 # Constant parameters
