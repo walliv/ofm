@@ -57,7 +57,7 @@ class base extends uvm_test;
     endfunction
 
     virtual task run_phase(uvm_phase phase);
-        time time_start;
+        time end_time;
         virt_seq #(USR_MFB_REGIONS, USR_MFB_REGION_SIZE, USR_MFB_BLOCK_SIZE, USR_MFB_ITEM_WIDTH,
                    CHANNELS, HDR_META_WIDTH, PKT_SIZE_MAX) m_virt_seq;
 
@@ -70,9 +70,12 @@ class base extends uvm_test;
         m_virt_seq.randomize();
         m_virt_seq.start(m_env.m_sequencer);
 
-        time_start = $time();
-        while((time_start + 500us) > $time() && m_env.m_scoreboard.used()) begin
+        end_time = $time();
+        `uvm_info(this.get_full_name(), $sformatf("\n\tVirtual sequence finished (%0d). Scoreboard used: %0d", end_time/1ns, m_env.m_scoreboard.used()), UVM_HIGH);
+
+        while((end_time + 200us) > $time() && (m_env.m_scoreboard.used() != 0)) begin
             #(600ns);
+            `uvm_info(this.get_full_name(), $sformatf("\n\tWaiting after virtual sequence finished."), UVM_HIGH);
         end
 
         for (int unsigned chan = 0; chan < CHANNELS; chan++) begin
