@@ -35,6 +35,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
 
     local uvm_tx_dma_calypte_regs::regmodel_top #(CHANNELS) m_regmodel_top;
 
+    protected int unsigned m_discard_wait;
     discard #(CHANNELS) m_discard_comp;
 
     // Counters for all of the channels
@@ -93,6 +94,7 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
         int unsigned ret = 0;
         ret |= (m_cq_data_analysis_fifo.used() != 0);
         ret |= (m_cq_meta_analysis_fifo.used() != 0);
+        ret |= m_discard_wait;
         return ret;
     endfunction
 
@@ -150,8 +152,10 @@ class model #(USR_MFB_ITEM_WIDTH, PCIE_CQ_MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER
             m_cq_data_analysis_fifo.get(cq_data_tr);
             m_cq_meta_analysis_fifo.get(cq_meta_tr);
 
+            m_discard_wait = 1;
             // Get information if the current transaction should be dropped
             m_discard_comp.get_tr(drop);
+            m_discard_wait = 0;
 
             // Parsing the input data according to the selected device
             if (DEVICE == "ULTRASCALE") begin
