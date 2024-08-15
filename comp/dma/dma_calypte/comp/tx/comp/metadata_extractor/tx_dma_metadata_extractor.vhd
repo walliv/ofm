@@ -104,6 +104,9 @@ architecture FULL of TX_DMA_METADATA_EXTRACTOR is
     signal pcie_mfb_data_arr     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_MFB_REGION_SIZE*PCIE_MFB_BLOCK_SIZE*PCIE_MFB_ITEM_WIDTH-1 downto 0);
     signal pcie_mfb_meta_arr     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_CQ_META_WIDTH -1 downto 0);
 
+    -- the extracted pcie header
+    signal pcie_hdr_data_int     : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(PCIE_META_REQ_HDR_W -1 downto 0);
+
     -- extracted fields from the PCIe header
     signal pcie_hdr_addr         : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(63 downto 0);
     signal pcie_hdr_bar_id       : slv_array_t(PCIE_MFB_REGIONS - 1 downto 0)(2 downto 0);
@@ -198,6 +201,13 @@ begin
     pcie_mfb_meta_arr   <= slv_array_deser(PCIE_MFB_META, PCIE_MFB_REGIONS);
 
     pcie_hdr_deparser_g: for i in PCIE_MFB_REGIONS - 1 downto 0 generate
+
+        device_sel_pcie_hdr_g: if (DEVICE = "ULTRASCALE") generate
+            pcie_hdr_data_int(i) <= pcie_mfb_data_arr(i)(PCIE_CQ_META_HEADER);
+        else generate
+            pcie_hdr_data_int(i) <= pcie_mfb_meta_arr(i)(PCIE_CQ_META_HEADER);
+        end generate;
+
         pcie_hdr_deparser_i : entity work.PCIE_CQ_HDR_DEPARSER
             generic map (
                 DEVICE => DEVICE)
@@ -217,7 +227,7 @@ begin
                 OUT_ADDR_LEN     => pcie_hdr_addr_len(i),
                 OUT_REQ_TYPE     => open,
 
-                IN_HEADER     => pcie_mfb_data_arr(i)(PCIE_CQ_META_HEADER),
+                IN_HEADER     => pcie_hdr_data_int(i),
                 IN_FBE        => pcie_mfb_meta_arr(i)(PCIE_CQ_META_FBE),
                 IN_LBE        => pcie_mfb_meta_arr(i)(PCIE_CQ_META_LBE),
 
