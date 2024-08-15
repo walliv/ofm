@@ -189,12 +189,12 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     endfunction
 
     function void regmodel_set(uvm_tx_dma_calypte_regs::regmodel_channel m_regmodel);
-        // status_cbs cbs;
+        status_cbs cbs;
 
         this.m_driv_data = new();
-        // cbs = new(this.m_driv_data);
+        cbs = new(this.m_driv_data);
         this.m_regmodel_channel = m_regmodel;
-        // uvm_reg_field_cb::add(this.m_regmodel_channel.control_reg.dma_enable, cbs);
+        uvm_reg_field_cb::add(this.m_regmodel_channel.control_reg.dma_enable, cbs);
     endfunction
 
     task wait_for_free_space(int unsigned requested_space, bit is_hdr);
@@ -461,14 +461,8 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         ptr_read(m_regmodel_channel.status_reg, m_driv_data.chan_active_reg);
         debug_msg = {debug_msg, $sformatf("\tChan active: 0x%h \n", m_driv_data.chan_active_reg)};
 
-        //SHUFLE AND SEND DATA
+        //(SHUFLE AND )SEND DATA
         // pcie_transactions.shuffle();
-
-        // while (it < pcie_transactions.size()) begin
-
-        //     pcie_transactions[it].size*(MFB_ITEM_WIDTH/8)
-
-        // end
 
         for (int unsigned it = 0; it < pcie_transactions.size(); it++) begin
             int trans_size = pcie_transactions[it].size*(MFB_ITEM_WIDTH/8);
@@ -617,7 +611,6 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, $sformatf("\tRead header pointer mask: 0x%h\n", m_driv_data.hdr_mask)};
             `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
-            //check for
             wait(m_driv_data.status_wait == 0);
             m_driv_data.status_sem.get();
 
