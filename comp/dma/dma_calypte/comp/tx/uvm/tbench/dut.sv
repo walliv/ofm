@@ -104,9 +104,4 @@ module DUT (
         .PCIE_CC_MFB_SRC_RDY      (),
         .PCIE_CC_MFB_DST_RDY      ()
     );
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 578d5316 (dut.sv [MAINTENANCE]: rename signals for consistency and better readability)
 endmodule
