@@ -20,7 +20,7 @@ class driver_data;
 	// channel is shut down during the send of this data. If it would not be there,
 	// the DMA header would not be send and the transaction with it dropped leaving
 	// the channel in an incomplete stop state.
-    logic [16-1 : 0] chan_active_reg;
+    logic [32-1 : 0] chan_active_reg;
 
     int unsigned data_free_space;
     int unsigned hdr_free_space;
@@ -108,6 +108,13 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         super.new(name, parent);
         m_reset_terminate = new();
     endfunction
+
+    task status_read(output logic [32-1:0] ptr);
+        uvm_status_e   status;
+        uvm_reg_data_t data;
+        m_regmodel_channel.status_reg.read(status, data);
+        ptr = data;
+    endtask
 
     task ptr_read(uvm_reg register, output logic [16-1:0] ptr);
         uvm_status_e   status;
@@ -458,7 +465,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
         // Figure out if the channel is active to determine if the update of pointer and check of free
         // space needs to be issued.
-        ptr_read(m_regmodel_channel.status_reg, m_driv_data.chan_active_reg);
+        status_read(m_driv_data.chan_active_reg);
         debug_msg = {debug_msg, $sformatf("\tChan active: 0x%h \n", m_driv_data.chan_active_reg)};
 
         //(SHUFLE AND )SEND DATA
