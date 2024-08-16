@@ -57,7 +57,6 @@ class status_cbs extends uvm_reg_cbs;
             data.status_sem.put();
         end
     endtask
-
 endclass
 
 class driver_sync #(MFB_ITEM_WIDTH, MFB_META_WIDTH);
@@ -206,22 +205,8 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
     task wait_for_free_space(int unsigned requested_space, bit is_hdr);
         logic [16-1:0] hw_ptr;
-        //logic [16-1:0] sw_ptr;
-        //logic [16-1:0] mask;
         string         debug_msg;
-        //uvm_reg        hw_reg;
         int unsigned   free_space;
-
-        // if (is_hdr == 0) begin
-        //     hw_reg = m_regmodel_channel.hw_data_pointer_reg;
-        //     sw_ptr = m_driv_data.data_addr;
-        //     mask   = m_driv_data.data_mask;
-
-        // end else begin
-        //     hw_reg = m_regmodel_channel.hw_hdr_pointer_reg;
-        //     sw_ptr = m_driv_data.hdr_addr;
-        //     mask   = m_driv_data.hdr_mask;
-        // end
 
         debug_msg = "\n";
         debug_msg = {debug_msg, $sformatf("\twait_for_free_space method:\n")};
@@ -588,8 +573,6 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
 
         // Initial wait for the reset to drop
         wait(m_reset_terminate.is_reset() == 1);
-        // TODO: This needs a more refinement since it does not wait
-        // until the reset actually drops in the waveforms.
         while(m_reset_terminate.has_been_reset() == 1)
             #(10ns);
 
@@ -612,9 +595,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, "==========================================================\n"};
             debug_msg = {debug_msg, req.convert2string()};
 
-            //ptr_read(m_regmodel_channel.data_mask_reg, m_driv_data.data_mask);
             debug_msg = {debug_msg, $sformatf("\n\n\tRead data pointer mask:   0x%h\n", m_driv_data.data_mask)};
-            //ptr_read(m_regmodel_channel.hdr_mask_reg , m_driv_data.hdr_mask);
             debug_msg = {debug_msg, $sformatf("\tRead header pointer mask: 0x%h\n", m_driv_data.hdr_mask)};
             `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
 
