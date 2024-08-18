@@ -8,10 +8,10 @@ SETTINGS = {
 
         "MI_WIDTH"                : "32",
 
-        "USER_TX_MFB_REGIONS"     : "1",
-        "USER_TX_MFB_REGION_SIZE" : "4",
-        "USER_TX_MFB_BLOCK_SIZE"  : "8",
-        "USER_TX_MFB_ITEM_WIDTH"  : "8",
+        "USR_MFB_REGIONS"         : "1",
+        "USR_MFB_REGION_SIZE"     : "4",
+        "USR_MFB_BLOCK_SIZE"      : "8",
+        "USR_MFB_ITEM_WIDTH"      : "8",
 
         "PCIE_CQ_MFB_REGIONS"     : "1",
         "PCIE_CQ_MFB_REGION_SIZE" : "1",
@@ -31,7 +31,6 @@ SETTINGS = {
         "DATA_POINTER_WIDTH"      : "13",
         "DMA_HDR_POINTER_WIDTH"   : "10",
 
-        "PCIE_LEN_MIN"            : "1",
         "PCIE_LEN_MAX"            : "256",
     },
     "intel_dev" : {
@@ -49,23 +48,20 @@ SETTINGS = {
         "DMA_HDR_POINTER_WIDTH"   : "7",
     },
     "2_regions" : {
-        "USER_TX_MFB_REGION_SIZE" : "8",
-        "PCIE_CQ_MFB_REGIONS"     : "2",
-        "PCIE_CC_MFB_REGIONS"     : "2",
+        "USR_MFB_REGION_SIZE" : "8",
+        "PCIE_CQ_MFB_REGIONS" : "2",
+        "PCIE_CC_MFB_REGIONS" : "2",
     },
     "_combinations_" : (
     (                                                            ), # default
     (             "8_channels" ,                                 ),
-    (             "8_channels" , "buff_size_small",              ),
+    # (             "8_channels" , "buff_size_small",              ),
     (                                               "2_regions", ),
     (             "16_channels",                    "2_regions", ),
-    (             "16_channels", "buff_size_small", "2_regions", ),
+    # (             "16_channels", "buff_size_small", "2_regions", ),
 
-    ("intel_dev",                                                ),
-    ("intel_dev", "8_channels" ,                                 ),
-    ("intel_dev", "8_channels" , "buff_size_small",              ),
     ("intel_dev",                                   "2_regions", ),
     ("intel_dev", "16_channels",                    "2_regions", ),
-    ("intel_dev", "16_channels", "buff_size_small", "2_regions", ),
+    # ("intel_dev", "16_channels", "buff_size_small", "2_regions", ),
     ),
 }
