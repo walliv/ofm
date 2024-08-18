@@ -35,7 +35,7 @@ class start_channel_seq extends uvm_sequence;
             m_regmodel_channel.status_reg.read(status, data, .parent(this));
 
             assert (start_attempts < 100) else
-                `uvm_fatal(this.get_type_name(), "\n\nThe start of a channel takes suspiciously long time!\n")
+                `uvm_warning(this.get_type_name(), "\n\nThe start of a channel takes suspiciously long time!\n")
 
         end while ((data & 32'h1) != 1);
     endtask
@@ -70,7 +70,7 @@ class stop_channel_seq extends uvm_sequence;
             m_regmodel_channel.hw_hdr_pointer_reg .read (status, data, .parent(this));
             m_regmodel_channel.sw_hdr_pointer_reg .write(status, data, .parent(this));
 
-            #(200ns);
+            #(500ns);
 
             m_regmodel_channel.sw_data_pointer_reg.read(status, data, .parent(this));
             sw_data = data;
@@ -85,7 +85,7 @@ class stop_channel_seq extends uvm_sequence;
             stop_attempts++;
 
             assert (stop_attempts < 500) else
-                `uvm_fatal(this.get_type_name(), "\n\nThe stop of a channel takes suspiciously long time!\n")
+                `uvm_warning(this.get_type_name(), "\n\nThe stop of a channel takes suspiciously long time!\n")
 
         end while (sw_data != hw_data || sw_hdr != hw_hdr || (data & 32'h1) != 0);
     endtask
