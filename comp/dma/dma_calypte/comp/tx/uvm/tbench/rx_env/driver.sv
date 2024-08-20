@@ -111,7 +111,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     task status_read(output logic [32-1:0] ptr);
         uvm_status_e   status;
         uvm_reg_data_t data;
-        m_regmodel_channel.control_reg.read(status, data);
+        m_regmodel_channel.status_reg.read(status, data);
         ptr = data;
     endtask
 
