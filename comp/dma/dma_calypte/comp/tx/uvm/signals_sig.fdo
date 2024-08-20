@@ -13,10 +13,10 @@ add_wave "-noupdate -color yellow -label RESET"   /testbench/DUT_U/VHDL_DUT_U/RE
 puts "==============================================="
 puts "Wave parameters:"
 puts "==============================================="
-set CHANNELS 4
+set CHANNELS 8
 set BUFF_SIZE 8192
-set REGIONS 2
-set DEVICE "AGILEX"
+set REGIONS 1
+set DEVICE "ULTRASCALE"
 
 # Constant parameters
 set PCIE_META_W 182
