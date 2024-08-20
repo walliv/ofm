@@ -70,8 +70,9 @@ entity TX_DMA_CALYPTE is
         -- =========================================================================================
         -- Pointer width for data and hdr buffers. The data pointer points to bytes of the packet.
         -- The header pointer points to the header of a current packet.
-        DATA_POINTER_WIDTH    : natural := 14;
-        DMA_HDR_POINTER_WIDTH : natural := 11;
+        DATA_POINTER_WIDTH    : natural := 13;
+        -- NOTE: Depracated, the width of the header pointer is calculated from DATA_POINTER_WIDTH
+        DMA_HDR_POINTER_WIDTH : natural := 10;
         -- Set the number of DMA channels, each channel has its separate buffer
         CHANNELS              : natural := 32;
 
@@ -205,7 +206,7 @@ architecture FULL of TX_DMA_CALYPTE is
     signal upd_hdp_en   : std_logic;
 
     signal upd_hhp_chan : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal upd_hhp_data : std_logic_vector(DMA_HDR_POINTER_WIDTH -1 downto 0);
+    signal upd_hhp_data : std_logic_vector(DATA_POINTER_WIDTH-3 -1 downto 0);
     signal upd_hhp_en   : std_logic;
 
     signal ext_mfb_data    : std_logic_vector(PCIE_CQ_MFB_WIDTH -1 downto 0);
@@ -260,7 +261,7 @@ architecture FULL of TX_DMA_CALYPTE is
     -- attribute mark_debug of hdr_fifo_tx_src_rdy : signal is "true";
     -- attribute mark_debug of hdr_fifo_tx_dst_rdy : signal is "true";
 
-    signal hdr_fifo_status : std_logic_vector(log2((2**DMA_HDR_POINTER_WIDTH) * CHANNELS) downto 0);
+    signal hdr_fifo_status : std_logic_vector(log2(2**(DATA_POINTER_WIDTH-3) * CHANNELS) downto 0);
     -- attribute mark_debug of hdr_fifo_status : signal is "true";
 
     -- parsed specific bits from st_sp_ctrl_mfb_meta_arr that indicate the validity of the DMA
@@ -303,10 +304,6 @@ begin
         report "TX_DMA_CALYPTE: too large PKT_SIZE_MAX, the internal buffer must be able to fit at least one packet of the size of the PKT_SIZE_MAX. Either change DATA_POINTER_WIDTH or PKT_SIZE_MAX generic."
         severity FAILURE;
 
-    assert (DMA_HDR_POINTER_WIDTH + 3 = DATA_POINTER_WIDTH)
-        report "TX_DMA_CALYPTE: The width of HDR pointer needs to be shorter by 3 bits from DATA pointer in order for PCIe addres fields to be aligned."
-        severity FAILURE;
-
     assert (DATA_POINTER_WIDTH <= 16)
         report "TX_DMA_CALYPTE: Too large data pointer, the length of 16 already allows to store 64KiB of data."
         severity FAILURE;
@@ -326,7 +323,7 @@ begin
             DISC_BTS_CNT_WIDTH => CNTRS_WIDTH,
 
             DATA_POINTER_WIDTH    => DATA_POINTER_WIDTH,
-            DMA_HDR_POINTER_WIDTH => DMA_HDR_POINTER_WIDTH,
+            DMA_HDR_POINTER_WIDTH => DATA_POINTER_WIDTH-3,
             PKT_SIZE_MAX          => PKT_SIZE_MAX,
             MI_WIDTH              => MI_WIDTH)
         port map (
@@ -369,7 +366,7 @@ begin
         generic map (
             DEVICE        => DEVICE,
             CHANNELS      => CHANNELS,
-            POINTER_WIDTH => maximum(DATA_POINTER_WIDTH, DMA_HDR_POINTER_WIDTH+3),
+            POINTER_WIDTH => DATA_POINTER_WIDTH,
 
             PCIE_MFB_REGIONS     => PCIE_CQ_MFB_REGIONS,
             PCIE_MFB_REGION_SIZE => PCIE_CQ_MFB_REGION_SIZE,
@@ -513,7 +510,7 @@ begin
         merge_fifo_i: entity work.FIFOX_MULTI
         generic map(
             DATA_WIDTH      => 62 + log2(CHANNELS) + 64,
-            ITEMS           => (2**DMA_HDR_POINTER_WIDTH) * CHANNELS,
+            ITEMS           => (2**(DATA_POINTER_WIDTH-3)) * CHANNELS,
             WRITE_PORTS     => PCIE_CQ_MFB_REGIONS,
             READ_PORTS      => 1,
             DEVICE          => DEVICE
@@ -544,7 +541,7 @@ begin
         generic map (
             ITEMS               => 1,
             ITEM_WIDTH          => 62 + log2(CHANNELS) + 64,
-            FIFO_DEPTH          => (2**DMA_HDR_POINTER_WIDTH) * CHANNELS,
+            FIFO_DEPTH          => (2**(DATA_POINTER_WIDTH-3)) * CHANNELS,
             RAM_TYPE            => "AUTO",
             DEVICE              => DEVICE,
             ALMOST_FULL_OFFSET  => 3,
@@ -587,7 +584,7 @@ begin
             MFB_ITEM_WIDTH  => USR_TX_MFB_ITEM_WIDTH,
 
             DATA_POINTER_WIDTH    => DATA_POINTER_WIDTH,
-            DMA_HDR_POINTER_WIDTH => DMA_HDR_POINTER_WIDTH)
+            DMA_HDR_POINTER_WIDTH => DATA_POINTER_WIDTH-3)
         port map (
             CLK   => CLK,
             RESET => RESET,
