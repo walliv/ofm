@@ -87,7 +87,7 @@ entity TX_DMA_CALYPTE is
 
         ST_SP_DBG_SIGNAL_W : natural := 4;
         -- Size of the largest packets that can be transmitted on the USR_TX_MFB interface.
-        PKT_SIZE_MAX   : natural := 2**11
+        PKT_SIZE_MAX   : natural := 2**12
         );
     port (
         CLK   : in std_logic;
