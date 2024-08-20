@@ -98,7 +98,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
     typedef struct{
         uvm_logic_vector_array::sequence_item #(MFB_ITEM_WIDTH)                  data;
         uvm_logic_vector::sequence_item #(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH) meta;
-        int unsigned                                                             size;
+        int unsigned                                                             byte_size;
     } pcie_info;
 
     // ------------------------------------------------------------------------
@@ -260,7 +260,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         `uvm_info(this.get_full_name(), debug_msg, UVM_HIGH);
     endtask
 
-    function pcie_info create_pcie_req(logic [64-1 : 0] pcie_addr, logic [11-1 : 0] pcie_len, logic [4-1:0] fbe, logic [4-1:0] lbe, logic[MFB_ITEM_WIDTH-1:0] data[]);
+    function pcie_info create_pcie_req(logic [64-1 : 0] pcie_addr, logic [11-1 : 0] pcie_len, logic [4-1:0] fbe, logic [4-1:0] lbe, logic[MFB_ITEM_WIDTH-1:0] data[], int unsigned byte_len);
         pcie_info ret;
         logic [PCIE_HDR_SIZE-1:0] pcie_hdr;
 
@@ -268,7 +268,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         ret.meta = uvm_logic_vector::sequence_item#(sv_pcie_meta_pack::PCIE_CQ_META_WIDTH)::type_id::create("pcie_tr.meta");
 
         pcie_hdr = '0;
-        ret.size = pcie_len;
+        ret.byte_size = byte_len;
        
         if (DEVICE == "ULTRASCALE") begin
             pcie_hdr[63 : 2]    = pcie_addr[63 : 2];
@@ -353,7 +353,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             //GENERATE RANDOM SIZE OF BLOCKS
             rand_ret = std::randomize(pcie_len) with {pcie_len dist {[1:63] :/ 75, [64:PCIE_LEN_MAX/2-1] :/ 15,  [PCIE_LEN_MAX/2:PCIE_LEN_MAX-1] :/ 8, PCIE_LEN_MAX :/ 2}; };
             if (rand_ret == 0) begin
-                pcie_len = 256;
+                pcie_len = PCIE_LEN_MAX;
             end
 
             debug_msg = {debug_msg, "\n"};
@@ -429,7 +429,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             pcie_addr[DATA_POINTER_WIDTH-1 : 0] = pcie_trans_ptr; // Address is in bytes
             pcie_addr[(DATA_POINTER_WIDTH+1+$clog2(CHANNELS))-1 : DATA_POINTER_WIDTH+1] = m_channel;
             pcie_addr[(DATA_POINTER_WIDTH+$clog2(CHANNELS)+1)] = 1'b0;
-            pcie_transactions.push_back(create_pcie_req(pcie_addr, pcie_len, fbe, send_lbe, data));
+            pcie_transactions.push_back(create_pcie_req(pcie_addr, pcie_len, fbe, send_lbe, data, data_index));
 
             debug_msg = {debug_msg, "\n"};
             debug_msg = {debug_msg, "-----------------------------------------------\n"};
@@ -438,7 +438,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
             debug_msg = {debug_msg, $sformatf("\tdata_addr 0x%h(%0d)\n", pcie_trans_ptr, pcie_trans_ptr)};
             debug_msg = {debug_msg, $sformatf("\tpcie_addr 0x%h(%0d)\n", pcie_addr, pcie_addr)};
             debug_msg = {debug_msg, $sformatf("\tpcie_addr 0x%h(%0d) - CUTOUT\n", pcie_addr[DATA_POINTER_WIDTH-1 : 2], pcie_addr[DATA_POINTER_WIDTH-1 : 2])};
-            debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords\n", pcie_len)};
+            debug_msg = {debug_msg, $sformatf("\tpcie_len  %0d dwords (%0d B)\n", pcie_len, data_index)};
             debug_msg = {debug_msg, $sformatf("\tfbe %b lbe %b\n", fbe, lbe)};
             debug_msg = {debug_msg, print_data(data)};
 
@@ -457,19 +457,19 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         // pcie_transactions.shuffle();
 
         for (int unsigned it = 0; it < pcie_transactions.size(); it++) begin
-            int trans_size = pcie_transactions[it].size*(MFB_ITEM_WIDTH/8);
-            debug_msg = {debug_msg, $sformatf("\tPutting transaction of size: %0d (free space: %0d)\n", trans_size, m_driv_data.data_free_space)};
+            int trans_byte_size = pcie_transactions[it].byte_size;
+            debug_msg = {debug_msg, $sformatf("\tPutting transaction of size: %0d (free space: %0d)\n", trans_byte_size, m_driv_data.data_free_space)};
 
-            if (m_driv_data.data_free_space < trans_size) begin
-                wait_for_free_space(trans_size, 0);
+            if (m_driv_data.data_free_space < trans_byte_size) begin
+                wait_for_free_space(trans_byte_size, 0);
                 debug_msg = {debug_msg, $sformatf("\tNew free space after read: %0d\n", m_driv_data.data_free_space)};
             end
 
             m_data_export.put(m_channel, pcie_transactions[it].meta, pcie_transactions[it].data);
 
-            m_driv_data.data_addr = (m_driv_data.data_addr + trans_size) & m_driv_data.data_mask;
+            m_driv_data.data_addr = (m_driv_data.data_addr + trans_byte_size) & m_driv_data.data_mask;
             debug_msg = {debug_msg, $sformatf("\tNew internal data ptr: 0x%h\n", m_driv_data.data_addr)};
-            m_driv_data.data_free_space -= trans_size;
+            m_driv_data.data_free_space -= trans_byte_size;
         end
 
         debug_msg = {debug_msg, "\n"};
@@ -531,7 +531,7 @@ class driver #(DEVICE, MFB_ITEM_WIDTH, CHANNELS, DATA_POINTER_WIDTH, PCIE_LEN_MA
         pcie_addr[DATA_POINTER_WIDTH-1 : 0] = m_driv_data.hdr_addr*2*(MFB_ITEM_WIDTH/8); //Address is in DMA headers (64B)
         pcie_addr[(DATA_POINTER_WIDTH+1+$clog2(CHANNELS))-1 : DATA_POINTER_WIDTH+1] = m_channel;
         pcie_addr[(DATA_POINTER_WIDTH+$clog2(CHANNELS)+1)] = 1'b1;
-        pcie_transaction = create_pcie_req(pcie_addr, pcie_len, fbe, lbe, {dma_hdr[31 : 0], dma_hdr[63 : 32]});
+        pcie_transaction = create_pcie_req(pcie_addr, pcie_len, fbe, lbe, {dma_hdr[31 : 0], dma_hdr[63 : 32]}, 8);
 
         debug_msg = "\n";
         debug_msg = {debug_msg, "-----------------------------------------------\n"};
