@@ -64,18 +64,21 @@ end entity;
 
 architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
-    constant MFB_LENGTH   : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
+    constant MFB_LENGTH      : natural := MFB_REGIONS*MFB_REGION_SIZE*MFB_BLOCK_SIZE*MFB_ITEM_WIDTH;
     -- Number of Dwords in MFB word (equal as the nummber of items)
-    constant MFB_DWORDS    : natural := MFB_LENGTH/MFB_ITEM_WIDTH;
+    constant MFB_DWORDS      : natural := MFB_LENGTH/MFB_ITEM_WIDTH;
     -- Number of bytes in MFB word 
-    constant MFB_BYTES    : natural := MFB_LENGTH/8;
+    constant MFB_BYTES       : natural := MFB_LENGTH/8;
     -- The Address is restricted by BAR_APERTURE (IP_core setting)
-    constant BUFFER_DEPTH : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
+    constant BUFFER_DEPTH    : natural := (2**POINTER_WIDTH)/(MFB_LENGTH/8);
     -- Number of input registers
-    constant BRAM_REG_NUM : natural := 2;
+    constant BRAM_REG_NUM    : natural := 2;
     -- Number of registers between BRAMs and barrel shifter
-    constant INP_REG_NUM  : natural := 1;
-
+    constant INP_REG_NUM     : natural := 1;
+    -- The amount of channels that fits to one array
+    constant CHANS_PER_ARRAY : natural := minimum(CHANNELS, 4096/BUFFER_DEPTH);
+    -- Number of memory arrays since one array can contain multiple channels
+    constant MEM_ARRAYS      : natural := CHANNELS/CHANS_PER_ARRAY;
 
     -- =============================================================================================
     -- Defining ranges for meta signal
@@ -95,6 +98,8 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     subtype META_CHAN_NUM   is natural range     META_CHAN_NUM_O + META_CHAN_NUM_W -1 downto META_CHAN_NUM_O;
     subtype META_BE         is natural range                 META_BE_O + META_BE_W -1 downto META_BE_O;
 
+    subtype META_MEM_ARR_IDX is natural range log2(MEM_ARRAYS) + log2(CHANS_PER_ARRAY) + META_CHAN_NUM_O -1 downto log2(CHANS_PER_ARRAY) + META_CHAN_NUM_O;
+
     -- Input register
     signal pcie_mfb_data_inp_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_DATA'range);
     signal pcie_mfb_meta_inp_reg    : slv_array_t(INP_REG_NUM downto 0)(PCIE_MFB_META'range);
@@ -109,17 +114,17 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
     signal wr_shift_sel             : slv_array_t(MFB_REGIONS - 1 downto 0)(log2(MFB_LENGTH/32) -1 downto 0);
 
     signal wr_be_bram_bshifter      : slv_array_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_be_bram_demux         : slv_array_2d_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_be_bram_demux         : slv_array_2d_t(MEM_ARRAYS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_addr_bram_by_shift    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH*CHANS_PER_ARRAY) -1 downto 0);
     signal wr_data_bram_bshifter    : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
-    signal chan_num_pst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
-    signal chan_num_nst             : std_logic_vector(log2(CHANNELS) -1 downto 0);
+    signal chan_num_pst             : std_logic_vector(log2(MEM_ARRAYS) -1 downto 0);
+    signal chan_num_nst             : std_logic_vector(log2(MEM_ARRAYS) -1 downto 0);
 
-    signal rd_en_bram_demux         : std_logic_vector(CHANNELS -1 downto 0);
+    signal rd_en_bram_demux         : std_logic_vector(MEM_ARRAYS -1 downto 0);
     signal rd_data_bram_mux         : std_logic_vector(MFB_LENGTH -1 downto 0);
-    signal rd_data_bram             : slv_array_2d_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
-    signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal rd_data_bram             : slv_array_2d_t(MEM_ARRAYS -1 downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
+    signal rd_addr_bram_by_shift    : slv_array_t((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH*CHANS_PER_ARRAY) -1 downto 0);
 
     -- ================= --
     -- 2 regions support --
@@ -129,28 +134,31 @@ architecture FULL of TX_DMA_PCIE_TRANS_BUFFER is
 
     -- Converter signal: PCIE_MFB_DATA'length/32 => PCIE_MFB_DATA'length/ 8
     -- Address the item in a BRAM for each byte for each region
-    signal wr_addr_bram_by_multi    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_addr_bram_by_multi    : slv_array_2d_t(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH*CHANS_PER_ARRAY) -1 downto 0);
 
     -- Read/Write Address - TDP
-    signal rw_addr_bram_by_mux      : slv_array_3d_t(CHANNELS - 1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal rw_addr_bram_by_mux      : slv_array_3d_t(MEM_ARRAYS - 1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0)(log2(BUFFER_DEPTH*CHANS_PER_ARRAY) -1 downto 0);
 
     -- Read data valid - TDP
     signal rd_data_valid_arr        : std_logic_vector(MFB_REGIONS - 1 downto 0);
 
     -- Read enable per channel
-    signal rd_en_pch                : slv_array_t(CHANNELS - 1 downto 0)(MFB_REGIONS - 1 downto 0);
+    signal rd_en_pch                : slv_array_t(MEM_ARRAYS - 1 downto 0)(MFB_REGIONS - 1 downto 0);
 
     -- Meta signal for whole MFB word
     signal pcie_meta_be_per_port  : slv_array_t(MFB_REGIONS - 1 downto 0)(MFB_LENGTH/8 - 1 downto 0);
 
     -- BRAM registers
-    signal wr_be_bram_demux_reg      : slv_array_3d_t(BRAM_REG_NUM downto 0)(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
-    signal wr_addr_bram_by_shift_reg : slv_array_3d_t(BRAM_REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH) -1 downto 0);
+    signal wr_be_bram_demux_reg      : slv_array_3d_t(BRAM_REG_NUM downto 0)(MEM_ARRAYS -1 downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/8) -1 downto 0);
+    signal wr_addr_bram_by_shift_reg : slv_array_3d_t(BRAM_REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)((PCIE_MFB_DATA'length/32) -1 downto 0)(log2(BUFFER_DEPTH*CHANS_PER_ARRAY) -1 downto 0);
     signal wr_data_bram_shifter_reg  : slv_array_2d_t(BRAM_REG_NUM downto 0)(MFB_REGIONS - 1 downto 0)(MFB_LENGTH -1 downto 0);
 
-    signal addr_sel                 : slv_array_t(CHANNELS -1 downto 0)(MFB_REGIONS - 1 downto 0);
+    signal addr_sel                 : slv_array_t(MEM_ARRAYS -1 downto 0)(MFB_REGIONS - 1 downto 0);
 
 begin
+
+    -- assert (FALSE) report "PCIE_TRANS_BUFFER: set amount of chans per array: " & to_string(CHANS_PER_ARRAY) & " and the amount of arrays: " & to_string(MEM_ARRAYS) severity FAILURE;
+
     -- =============================================================================================
     -- Input shift registers
     -- =============================================================================================
@@ -220,9 +228,9 @@ begin
     begin
         addr_cntr_nst <= addr_cntr_pst;
 
-        -- Increment the address for a next word by 8 (the number of DWs in the word) to be written
-        -- to the BRAMs.
-        -- When the new packet arrives, its address is stored and incremented by one region size
+        -- Increment the address for a next word by 8 (the number of DWs in the
+        -- word) to be written to the BRAMs.  When the new packet arrives, its
+        -- address is stored and incremented by one region size
 
         -- Be careful! The number '8' is only correct for one region
         if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
@@ -384,6 +392,7 @@ begin
     wr_addr_correction_a_p: process (all) is
         variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
         variable buff_addr_v          : std_logic_vector(log2(BUFFER_DEPTH) -1 downto 0);
+        variable chan_addr_v          : std_logic_vector(log2(CHANS_PER_ARRAY) -1 downto 0);
     begin
         wr_addr_bram_by_shift(0) <= (others => (others => '0'));
 
@@ -392,24 +401,26 @@ begin
                 -- Pass address to variable
                 pcie_mfb_meta_addr_v := pcie_mfb_meta_arr(0)(META_PCIE_ADDR);
                 buff_addr_v          := pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS));
+                chan_addr_v          := pcie_mfb_meta_addr_v(log2(CHANS_PER_ARRAY) + 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS));
 
-                wr_addr_bram_by_shift(0) <= (others => buff_addr_v);
+                wr_addr_bram_by_shift(0) <= (others => (chan_addr_v & buff_addr_v));
 
                 -- Increment address in bytes that have been rotated
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
                     if (i < unsigned(pcie_mfb_meta_addr_v(log2(MFB_DWORDS) - 1 downto 0))) then
-                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
+                        wr_addr_bram_by_shift(0)(i) <= chan_addr_v & std_logic_vector(unsigned(buff_addr_v) + 1);
                     end if;
                 end loop;
             else
                 buff_addr_v := std_logic_vector(addr_cntr_pst(log2(BUFFER_DEPTH) + log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS)));
+                chan_addr_v := std_logic_vector(addr_cntr_pst(log2(CHANS_PER_ARRAY) + 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS)));
 
-                wr_addr_bram_by_shift(0) <= (others => buff_addr_v);
+                wr_addr_bram_by_shift(0) <= (others => (chan_addr_v & buff_addr_v));
 
                 -- Increment address in bytes that have been rotated
                 for i in 0 to ((MFB_LENGTH/32) -1) loop
                     if (i < addr_cntr_pst(log2(MFB_DWORDS) - 1 downto 0)) then
-                        wr_addr_bram_by_shift(0)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
+                        wr_addr_bram_by_shift(0)(i) <= chan_addr_v & std_logic_vector(unsigned(buff_addr_v) + 1);
                     end if;
                 end loop;
             end if;
@@ -421,6 +432,7 @@ begin
         wr_addr_correction_b_p: process (all) is
             variable pcie_mfb_meta_addr_v : std_logic_vector(META_PCIE_ADDR_W -1 downto 0);
             variable buff_addr_v          : std_logic_vector(log2(BUFFER_DEPTH) -1 downto 0);
+            variable chan_addr_v          : std_logic_vector(log2(CHANS_PER_ARRAY) -1 downto 0);
         begin
             wr_addr_bram_by_shift(1) <= (others => (others => '0'));
 
@@ -429,13 +441,14 @@ begin
                     -- Pass address to variable
                     pcie_mfb_meta_addr_v := pcie_mfb_meta_arr(1)(META_PCIE_ADDR);
                     buff_addr_v          := pcie_mfb_meta_addr_v(log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto log2(MFB_DWORDS));
+                    chan_addr_v          := pcie_mfb_meta_addr_v(log2(CHANS_PER_ARRAY) + 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS) -1 downto 1 + log2(BUFFER_DEPTH)+log2(MFB_DWORDS));
 
-                    wr_addr_bram_by_shift(1) <= (others => buff_addr_v);
+                    wr_addr_bram_by_shift(1) <= (others => (chan_addr_v & buff_addr_v));
 
                     -- Increment address in bytes that has been overflowed
                     for i in 0 to ((MFB_LENGTH/32) -1) loop
                         if (i < unsigned(pcie_mfb_meta_addr_v(log2(MFB_DWORDS) - 1 downto 0))) then
-                            wr_addr_bram_by_shift(1)(i) <= std_logic_vector(unsigned(buff_addr_v) + 1);
+                            wr_addr_bram_by_shift(1)(i) <= chan_addr_v & std_logic_vector(unsigned(buff_addr_v) + 1);
                         end if;
                     end loop;
                 -- else is not the case - the first port will handle it 
@@ -449,6 +462,9 @@ begin
     -- =============================================================================================
     -- Demultiplexer is based on value of META(Channel)
     -- Last value of the Channel is stored
+    -- TODO: It should be taken into consideration that this storing process should be removed
+    -- because the channel number is already extracted in METADATA_EXTRACTOR and the index of a
+    -- channel is held through the duration of a whole packet.
     chan_num_hold_reg_p: process (CLK) is
     begin
         if (rising_edge(CLK)) then
@@ -460,9 +476,11 @@ begin
         end if;
     end process;
 
-    -- This FSM stores the number of a channel in order to properly steer the demultiplexers. It
-    -- stores channel number for the last valid SOF in the word.
+    -- This FSM stores a part of a channel number to determine the memory array
+    -- to which the data ought to be send. It stores channel number for the last
+    -- valid SOF in the word.
     chan_num_hold_nst_logic_p: process (all) is
+        variable chan_num_v : std_logic_vector(log2(CHANNELS) -1 downto 0);
     begin
         chan_num_nst <= chan_num_pst;
 
@@ -470,7 +488,10 @@ begin
         if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
             for i in 0 to (MFB_REGIONS - 1) loop 
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(i) = '1') then
-                    chan_num_nst <= pcie_mfb_meta_arr(i)(META_CHAN_NUM);
+
+                    chan_num_v := pcie_mfb_meta_arr(i)(META_CHAN_NUM);
+                    chan_num_nst <= chan_num_v(log2(MEM_ARRAYS) + log2(CHANS_PER_ARRAY) -1 downto log2(CHANS_PER_ARRAY));
+
                 end if;
             end loop;
         end if;
@@ -492,9 +513,9 @@ begin
         for i in 0 to (MFB_REGIONS - 1) loop
             if (pcie_mfb_src_rdy_inp_reg(INP_REG_NUM) = '1') then
                 if (pcie_mfb_sof_inp_reg(INP_REG_NUM)(i) = '1') then
-                    wr_be_bram_demux(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_CHAN_NUM))))(i) <= wr_be_bram_bshifter(i);
+                    wr_be_bram_demux(to_integer(unsigned(pcie_mfb_meta_arr(i)(META_MEM_ARR_IDX))))(i) <= wr_be_bram_bshifter(i);
                 else
-                    wr_be_bram_demux(to_integer(unsigned(chan_num_pst)))(i)                        <= wr_be_bram_bshifter(i);
+                    wr_be_bram_demux(to_integer(unsigned(chan_num_pst)))(i)                           <= wr_be_bram_bshifter(i);
                 end if;
             end if;
         end loop;
@@ -525,7 +546,7 @@ begin
     -- =============================================================================================
     -- One region
     sdp_bram_g: if (MFB_REGIONS = 1) generate
-        brams_for_channels_g : for ch in 0 to (CHANNELS -1) generate
+        brams_for_channels_g : for mem_arr_idx in 0 to (MEM_ARRAYS -1) generate
             brams_per_byte : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
                 ram_type_g: if (BUFFER_DEPTH >= 2048) generate
                     sdp_bram_be_i : entity work.SDP_BRAM_BE
@@ -536,7 +557,7 @@ begin
                             -- each BRAM allows to write a single DW
                             DATA_WIDTH     => 8,
                             -- the depth of the buffer
-                            ITEMS          => BUFFER_DEPTH,
+                            ITEMS          => BUFFER_DEPTH*CHANS_PER_ARRAY,
                             COMMON_CLOCK   => TRUE,
                             OUTPUT_REG     => FALSE,
                             METADATA_WIDTH => 0,
@@ -545,7 +566,7 @@ begin
                         port map (
                             WR_CLK      => CLK,
                             WR_RST      => RESET,
-                            WR_EN       => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0)(wbyte),
+                            WR_EN       => wr_be_bram_demux_reg(BRAM_REG_NUM)(mem_arr_idx)(0)(wbyte),
                             WR_BE       => (others => '1'),
                             WR_ADDR     => wr_addr_bram_by_shift_reg(BRAM_REG_NUM)(0)(wbyte/4),
                             WR_DATA     => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
@@ -553,10 +574,10 @@ begin
                             RD_CLK      => CLK,
                             RD_RST      => RESET,
                             RD_EN       => '1',
-                            RD_PIPE_EN  => rd_en_bram_demux(ch),
+                            RD_PIPE_EN  => rd_en_bram_demux(mem_arr_idx),
                             RD_META_IN  => (others => '0'),
                             RD_ADDR     => rd_addr_bram_by_shift(wbyte),
-                            RD_DATA     => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8),
+                            RD_DATA     => rd_data_bram(mem_arr_idx)(0)(wbyte*8 +7 downto wbyte*8),
                             RD_META_OUT => open,
                             RD_DATA_VLD => open);
 
@@ -564,7 +585,7 @@ begin
                     gen_lutram_i: entity work.GEN_LUTRAM
                         generic map (
                             DATA_WIDTH         => 8,
-                            ITEMS              => BUFFER_DEPTH,
+                            ITEMS              => BUFFER_DEPTH*CHANS_PER_ARRAY,
                             RD_PORTS           => 1,
                             RD_LATENCY         => 1,
                             WRITE_USE_RD_ADDR0 => False,
@@ -572,11 +593,11 @@ begin
                             DEVICE             => DEVICE)
                         port map (
                             CLK     => CLK,
-                            WR_EN   => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0)(wbyte),
+                            WR_EN   => wr_be_bram_demux_reg(BRAM_REG_NUM)(mem_arr_idx)(0)(wbyte),
                             WR_ADDR => wr_addr_bram_by_shift_reg(BRAM_REG_NUM)(0)(wbyte/4),
                             WR_DATA => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
                             RD_ADDR => rd_addr_bram_by_shift(wbyte),
-                            RD_DATA => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8));
+                            RD_DATA => rd_data_bram(mem_arr_idx)(0)(wbyte*8 +7 downto wbyte*8));
                 end generate;
             end generate;
         end generate;
@@ -603,13 +624,13 @@ begin
         -- OPT: ORing the whole signal can be logically intensive. This could be done.
         -- in the beginning by oring only 4 first bits because there is a FBE portion which
         -- always has to have at least 1 bit set to 1.
-        addr_sel_g: for ch in 0 to (CHANNELS -1) generate
+        addr_sel_g: for ch in 0 to (MEM_ARRAYS -1) generate
             addr_sel(ch)(0) <= or wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0);
             addr_sel(ch)(1) <= or wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(1);
         end generate;
 
         -- The Address Multiplexer - Choose between Write and Read Port
-        addr_mux_chans_g : for ch in 0 to (CHANNELS -1) generate
+        addr_mux_chans_g : for ch in 0 to (MEM_ARRAYS -1) generate
             addr_mux_regions_g : for rgn in 0 to (MFB_REGIONS -1) generate
                 addr_mux_p: process(all)
                 begin
@@ -626,20 +647,20 @@ begin
         end generate;
 
         -- Read enable - Write port priority
-        rd_en_ch_g : for ch in 0 to (CHANNELS -1) generate
+        rd_en_ch_g : for ch in 0 to (MEM_ARRAYS -1) generate
             rd_en_reg_g : for rgn in 0 to (MFB_REGIONS -1) generate
                 -- Read enable per channel
                 rd_en_pch(ch)(rgn) <= rd_en_bram_demux(ch) and (not addr_sel(ch)(rgn));
             end generate;
         end generate;
 
-        brams_for_channels_g : for ch in 0 to (CHANNELS -1) generate
+        brams_for_channels_g : for mem_arr_idx in 0 to (MEM_ARRAYS -1) generate
             tdp_bram_be_g : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
 
                 tdp_bram_be_i : entity work.DP_BRAM_BEHAV
                     generic map (
                         DATA_WIDTH => 8,
-                        ITEMS      => BUFFER_DEPTH,
+                        ITEMS      => CHANS_PER_ARRAY*BUFFER_DEPTH,
                         OUTPUT_REG => FALSE,
                         RDW_MODE_A => "WRITE_FIRST",
                         RDW_MODE_B => "WRITE_FIRST"
@@ -652,22 +673,22 @@ begin
                         -- Port A
                         -- =======================================================================
                         PIPE_ENA => '1',
-                        REA      => rd_en_pch(ch)(0),
-                        WEA      => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(0)(wbyte),
-                        ADDRA    => rw_addr_bram_by_mux(ch)(0)(wbyte),
+                        REA      => rd_en_pch(mem_arr_idx)(0),
+                        WEA      => wr_be_bram_demux_reg(BRAM_REG_NUM)(mem_arr_idx)(0)(wbyte),
+                        ADDRA    => rw_addr_bram_by_mux(mem_arr_idx)(0)(wbyte),
                         DIA      => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
-                        DOA      => rd_data_bram(ch)(0)(wbyte*8 +7 downto wbyte*8),
+                        DOA      => rd_data_bram(mem_arr_idx)(0)(wbyte*8 +7 downto wbyte*8),
                         DOA_DV   => open,
 
                         -- =======================================================================
                         -- Port B
                         -- =======================================================================
                         PIPE_ENB => '1',
-                        REB      => rd_en_pch(ch)(1),
-                        WEB      => wr_be_bram_demux_reg(BRAM_REG_NUM)(ch)(1)(wbyte),
-                        ADDRB    => rw_addr_bram_by_mux(ch)(1)(wbyte),
+                        REB      => rd_en_pch(mem_arr_idx)(1),
+                        WEB      => wr_be_bram_demux_reg(BRAM_REG_NUM)(mem_arr_idx)(1)(wbyte),
+                        ADDRB    => rw_addr_bram_by_mux(mem_arr_idx)(1)(wbyte),
                         DIB      => wr_data_bram_shifter_reg(BRAM_REG_NUM)(1)(wbyte*8 +7 downto wbyte*8),
-                        DOB      => rd_data_bram(ch)(1)(wbyte*8 +7 downto wbyte*8),
+                        DOB      => rd_data_bram(mem_arr_idx)(1)(wbyte*8 +7 downto wbyte*8),
                         DOB_DV   => open
                     );
             end generate;
@@ -679,7 +700,7 @@ begin
 
                 rd_data_valid_arr   <= (others => '0');
 
-                for ch in 0 to (CHANNELS -1) loop
+                for ch in 0 to (MEM_ARRAYS -1) loop
                     for rgn in 0 to (MFB_REGIONS - 1) loop
                         if rd_en_pch(ch)(rgn) = '1' then
                             rd_data_valid_arr(rgn) <= '1';
@@ -699,7 +720,7 @@ begin
         rd_en_bram_demux <= (others => '0');
 
         if (RD_EN = '1') then
-            rd_en_bram_demux(to_integer(unsigned(RD_CHAN))) <= '1';
+            rd_en_bram_demux(to_integer(unsigned(RD_CHAN(log2(MEM_ARRAYS) + log2(CHANS_PER_ARRAY) -1 downto log2(CHANS_PER_ARRAY))))) <= '1';
         end if;
     end process;
 
@@ -712,16 +733,17 @@ begin
             end if;
         end process;
 
-        rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)))(0);
+        rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN(log2(MEM_ARRAYS) + log2(CHANS_PER_ARRAY) -1 downto log2(CHANS_PER_ARRAY)))))(0);
     else generate
 
         rd_data_demux_p: process(all)
         begin 
-            rd_data_bram_mux    <= (others => '0');
-            RD_DATA_VLD         <= '0';
+            rd_data_bram_mux <= (others => '0');
+            RD_DATA_VLD      <= '0';
+
             for i in 0 to MFB_REGIONS - 1  loop
                 if rd_data_valid_arr(i) = '1' then 
-                    rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN)))(i);
+                    rd_data_bram_mux <= rd_data_bram(to_integer(unsigned(RD_CHAN(log2(MEM_ARRAYS) + log2(CHANS_PER_ARRAY) -1 downto log2(CHANS_PER_ARRAY)))))(i);
                     RD_DATA_VLD      <= '1';
                 end if;
             end loop;
@@ -743,12 +765,14 @@ begin
         );
 
     rd_addr_recalc_p : process (all) is
+        variable chan_addr_v : std_logic_vector(log2(CHANS_PER_ARRAY) -1 downto 0);
     begin
-        rd_addr_bram_by_shift <= (others => RD_ADDR(log2(BUFFER_DEPTH)+log2(MFB_BYTES) -1 downto log2(MFB_BYTES)));
+        chan_addr_v           := RD_CHAN(log2(CHANS_PER_ARRAY) -1 downto 0);
+        rd_addr_bram_by_shift <= (others => (chan_addr_v & RD_ADDR(log2(BUFFER_DEPTH)+log2(MFB_BYTES) -1 downto log2(MFB_BYTES))));
 
         for i in 0 to ((MFB_LENGTH/8) -1) loop
             if (i < unsigned(RD_ADDR(log2(MFB_BYTES) - 1 downto 0))) then
-                rd_addr_bram_by_shift(i) <= std_logic_vector(unsigned(RD_ADDR(log2(BUFFER_DEPTH) + log2(MFB_BYTES) -1 downto log2(MFB_BYTES))) + 1);
+                rd_addr_bram_by_shift(i) <= chan_addr_v & std_logic_vector(unsigned(RD_ADDR(log2(BUFFER_DEPTH) + log2(MFB_BYTES) -1 downto log2(MFB_BYTES))) + 1);
             end if;
         end loop;
     end process;
