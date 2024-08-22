@@ -17,13 +17,13 @@ class data_comparer #(ITEM_WIDTH) extends uvm_common::comparer_ordered #(uvm_log
         int unsigned newline_break_cntr = 0;
         int unsigned last_wrong_byte_idx = 0;
 
-        $swrite(msg, "%s\n\tDUT PACKET %s\n\n", msg, tr_dut.convert2string());
-        $swrite(msg, "%s\n\tMODEL PACKET%s\n",  msg, tr_model.convert2string());
+        msg = $sformatf("%s\n\tDUT PACKET %s\n\n", msg, tr_dut.convert2string());
+        msg = $sformatf("%s\n\tMODEL PACKET%s\n",  msg, tr_model.convert2string());
 
-        $swrite(msg, "%s\n\tWRONG_BYTES:\n",  msg);
+        msg = $sformatf("%s\n\tWRONG_BYTES:\n",  msg);
 
         if (tr_model.item.size() != tr_dut.in_item.size()) begin
-            $write(msg, "%s\tTransaction lengths match: NO (MODEL: %0d, DUT: %0d)\n. Unable to compare!\n", msg, tr_model.item.data.size(), tr_dut.in_item.data.size());
+            msg = $sformatf("%s\tTransaction lengths match: NO (MODEL: %0d, DUT: %0d)\n. \tUnable to compare!\n", msg, tr_model.item.data.size(), tr_dut.in_item.data.size());
         end else begin
             msg = $sformatf("%s\tTransaction lengths match: YES\n", msg);
             msg = $sformatf("%s\t", msg);
