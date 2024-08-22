@@ -222,9 +222,6 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_di
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_wr
 
-    add_wave "-noupdate -group \"INTERNALS\"" $PATH/dma_hdr_data
-    add_wave "-noupdate -group \"INTERNALS\"" $PATH/dma_hdr_src_rdy
-    add_wave "-noupdate -group \"INTERNALS\"" $PATH/fifox_mult_empty
 
     add wave -group "INTERNALS" -noupdate -divider "Header_buffer_reading_interface"
     dma_hdr_deparse $PATH/st_sp_ctrl_mfb_data "INTERNALS" 2
@@ -241,7 +238,8 @@ proc internals {PATH META_IS_DMA_HDR_W META_PCIE_ADDR_W META_CHAN_NUM_W META_BE_
     }
     add_wave "-noupdate -group \"INTERNALS\" -label \"dma_hdr_addr\" -hex" $PATH/hdr_fifo_tx_data([expr $META_PCIE_ADDR_W + $META_CHAN_NUM_W + 64 -1]\ downto\ [expr $META_CHAN_NUM_W + 64])
 
-    add_wave "-noupdate -group \"INTERNALS\" -label \"fifo_status\" -unsigned" $PATH/dma_hdr_fifo_i/STATUS
+    add_wave "-noupdate -group \"INTERNALS\" -label \"fifo_status\" -unsigned" $PATH/dma_hdr_fifo_i/fifox_gen/fifox_i/STATUS
+    add_wave "-noupdate -group \"INTERNALS\" -label \"fifo_status\" -unsigned" $PATH/dma_hdr_fifo_i/single_fifox_gen/fifox_i/STATUS
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/hdr_fifo_tx_src_rdy
     add_wave "-noupdate -group \"INTERNALS\"" $PATH/hdr_fifo_tx_dst_rdy
 
@@ -529,6 +527,7 @@ proc pkt_dispatcher {PATH} {
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/disp_fsm_mfb_eof
     add_wave "-noupdate -group \"$grp_name\"" $PATH/disp_fsm_mfb_sof
     add_wave "-noupdate -group \"$grp_name\"" $PATH/disp_fsm_mfb_eof
+    add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/disp_fsm_mfb_sof_pos
     add_wave "-noupdate -group \"$grp_name\" -bin" $PATH/disp_fsm_mfb_eof_pos
     add_wave "-noupdate -group \"$grp_name\"" $PATH/disp_fsm_mfb_src_rdy
 
@@ -563,12 +562,12 @@ proc conf_regs {PATH DEVICE} {
             # add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_0"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(0)/lutram_i/lutram_out_arr
 
             if {$i == 6 || $i == 7} {
-            if {$DEVICE == "ULTRASCALE"} {
-                add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_1"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(1)/lutram_i/distmem
-            } else {
-                add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_1"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(1)/lutram_i/WR_DATA
+                if {$DEVICE == "ULTRASCALE"} {
+                    add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_1"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(1)/lutram_i/distmem
+                } else {
+                    add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_1"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(1)/lutram_i/WR_DATA
 
-            }
+                }
                 # add_wave [list -noupdate -hex -group "CONFIGURATION REGISTERS" -label "${n}_1"] $PATH/reg_gen(${i})/nonconst_reg_g/reg_i/memg(1)/lutram_i/lutram_out_arr
             }
         }
