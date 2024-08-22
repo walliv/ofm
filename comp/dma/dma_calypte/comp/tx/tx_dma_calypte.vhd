@@ -261,9 +261,6 @@ architecture FULL of TX_DMA_CALYPTE is
     -- attribute mark_debug of hdr_fifo_tx_src_rdy : signal is "true";
     -- attribute mark_debug of hdr_fifo_tx_dst_rdy : signal is "true";
 
-    signal hdr_fifo_status : std_logic_vector(log2(2**(DATA_POINTER_WIDTH-3) * CHANNELS) downto 0);
-    -- attribute mark_debug of hdr_fifo_status : signal is "true";
-
     -- parsed specific bits from st_sp_ctrl_mfb_meta_arr that indicate the validity of the DMA
     -- header in a current word
     signal st_sp_ctrl_mfb_sof_masked       : std_logic_vector(PCIE_CQ_MFB_REGIONS -1 downto 0);
@@ -277,12 +274,15 @@ architecture FULL of TX_DMA_CALYPTE is
     -- fifox_multi support
     signal st_sp_ctrl_mfb_meta_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)((META_BE_W + META_BE_O) -1 downto 0);
     signal st_sp_ctrl_mfb_data_arr  : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)(PCIE_CQ_MFB_REGION_SIZE*PCIE_CQ_MFB_BLOCK_SIZE*PCIE_CQ_MFB_ITEM_WIDTH - 1 downto 0);
+
     signal fifox_mult_di            : slv_array_t(PCIE_CQ_MFB_REGIONS - 1 downto 0)(62 + log2(CHANNELS) + 64 - 1 downto 0);
     signal fifox_mult_wr            : std_logic_vector(PCIE_CQ_MFB_REGIONS - 1 downto 0);
-
-    signal dma_hdr_data             : std_logic_vector(62 + log2(CHANNELS) + 64 - 1 downto 0);
-    signal dma_hdr_src_rdy          : std_logic;
+    signal fifox_mult_full          : std_logic;
+    signal fifox_mult_rd            : std_logic_vector(0 downto 0);
     signal fifox_mult_empty         : std_logic_vector(0 downto 0);
+
+    -- signal dma_hdr_data             : std_logic_vector(62 + log2(CHANNELS) + 64 - 1 downto 0);
+    -- signal dma_hdr_src_rdy          : std_logic;
 
 begin
 
@@ -488,82 +488,54 @@ begin
             RD_EN       => trbuff_rd_en,
             RD_DATA_VLD => trbuff_rd_data_vld);
 
-    merge_fifo_g: if PCIE_CQ_MFB_REGIONS = 2 generate
-        -- Deserialize metadata for better handling
-        st_sp_ctrl_mfb_data_arr     <= slv_array_deser(st_sp_ctrl_mfb_data, PCIE_CQ_MFB_REGIONS);
+    -- Deserialize metadata for better handling
+    st_sp_ctrl_mfb_data_arr     <= slv_array_deser(st_sp_ctrl_mfb_data, PCIE_CQ_MFB_REGIONS);
 
-        -- Insert data for each DMA header
-        fifox_mult_di(0)    <= st_sp_ctrl_mfb_meta_arr(0)(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta_arr(0)(META_CHAN_NUM) & st_sp_ctrl_mfb_data_arr(0)(63 downto 0);
-        fifox_mult_di(1)    <= st_sp_ctrl_mfb_meta_arr(1)(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta_arr(1)(META_CHAN_NUM) & st_sp_ctrl_mfb_data_arr(1)(63 downto 0);
-
-        -- Set valid for each port
-        fifox_multi_vld_p: process(all) is
-        begin
-            if st_sp_ctrl_mfb_src_rdy = '1' then 
-                fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr;
-            else 
-                fifox_mult_wr   <= (others => '0');
-            end if;
-        end process; 
-
-        -- FIFOX MULTI: (2 to 1) 
-        merge_fifo_i: entity work.FIFOX_MULTI
-        generic map(
-            DATA_WIDTH      => 62 + log2(CHANNELS) + 64,
-            ITEMS           => (2**(DATA_POINTER_WIDTH-3)) * CHANNELS,
-            WRITE_PORTS     => PCIE_CQ_MFB_REGIONS,
-            READ_PORTS      => 1,
-            DEVICE          => DEVICE
-        )
-        port map (
-            CLK     => CLK,
-            RESET   => RESET,
-
-            DI      => slv_array_ser(fifox_mult_di),
-            WR      => fifox_mult_wr,
-            FULL    => open,
-            AFULL   => open,
-        
-            DO      => dma_hdr_data,
-            RD      => "1",
-            EMPTY   => fifox_mult_empty,
-            AEMPTY  => open
-        );
-
-        dma_hdr_src_rdy <= not fifox_mult_empty(0);
-    else generate
-        dma_hdr_data    <= st_sp_ctrl_mfb_meta(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta(META_CHAN_NUM) & st_sp_ctrl_mfb_data(63 downto 0);
-        dma_hdr_src_rdy <= st_sp_ctrl_mfb_src_rdy and st_sp_ctrl_mfb_meta(META_IS_DMA_HDR)(0);
+    -- Insert data for each DMA header
+    fifox_multi_data_g: for reg_idx in 0 to (PCIE_CQ_MFB_REGIONS-1) generate
+        fifox_mult_di(reg_idx)    <= st_sp_ctrl_mfb_meta_arr(reg_idx)(META_PCIE_ADDR) & st_sp_ctrl_mfb_meta_arr(reg_idx)(META_CHAN_NUM) & st_sp_ctrl_mfb_data_arr(reg_idx)(63 downto 0);
     end generate;
 
-    -- Add registers if DMA header overtakes the data
-    dma_hdr_fifo_i : entity work.MVB_FIFOX
-        generic map (
-            ITEMS               => 1,
-            ITEM_WIDTH          => 62 + log2(CHANNELS) + 64,
-            FIFO_DEPTH          => (2**(DATA_POINTER_WIDTH-3)) * CHANNELS,
-            RAM_TYPE            => "AUTO",
-            DEVICE              => DEVICE,
-            ALMOST_FULL_OFFSET  => 3,
-            ALMOST_EMPTY_OFFSET => 3,
-            FAKE_FIFO           => FALSE)
-        port map (
-            CLK   => CLK,
-            RESET => RESET,
+    -- Set valid for each port
+    fifox_multi_vld_p: process(all) is
+    begin
+        if st_sp_ctrl_mfb_src_rdy = '1' then
+            fifox_mult_wr   <= st_sp_ctrl_mfb_meta_is_dma_hdr;
+        else
+            fifox_mult_wr   <= (others => '0');
+        end if;
+    end process;
 
-            RX_DATA    => dma_hdr_data,
-            RX_VLD     => "1",
-            RX_SRC_RDY => dma_hdr_src_rdy,
-            RX_DST_RDY => st_sp_ctrl_mfb_dst_rdy,
+    st_sp_ctrl_mfb_dst_rdy <= not fifox_mult_full;
 
-            TX_DATA    => hdr_fifo_tx_data,
-            TX_VLD     => open,
-            TX_SRC_RDY => hdr_fifo_tx_src_rdy,
-            TX_DST_RDY => hdr_fifo_tx_dst_rdy,
+    -- FIFOX MULTI: (2 to 1)
+    dma_hdr_fifo_i : entity work.FIFOX_MULTI
+    generic map(
+        DATA_WIDTH      => 62 + log2(CHANNELS) + 64,
+        ITEMS           => (2**(DATA_POINTER_WIDTH-3)) * CHANNELS,
+        WRITE_PORTS     => PCIE_CQ_MFB_REGIONS,
+        READ_PORTS      => 1,
+        RAM_TYPE        => "URAM",
+        DEVICE          => DEVICE,
+        SAFE_READ_MODE  => false
+    )
+    port map (
+        CLK     => CLK,
+        RESET   => RESET,
 
-            STATUS => hdr_fifo_status,
-            AFULL  => open,
-            AEMPTY => open);
+        DI      => slv_array_ser(fifox_mult_di),
+        WR      => fifox_mult_wr,
+        FULL    => fifox_mult_full,
+        AFULL   => open,
+
+        DO      => hdr_fifo_tx_data,
+        RD      => fifox_mult_rd,
+        EMPTY   => fifox_mult_empty,
+        AEMPTY  => open
+    );
+
+    hdr_fifo_tx_src_rdy <= not fifox_mult_empty(0);
+    fifox_mult_rd(0)    <= hdr_fifo_tx_dst_rdy;
 
     tx_dma_pkt_dispatcher_i : entity work.TX_DMA_PKT_DISPATCHER
         generic map (
