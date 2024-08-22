@@ -548,7 +548,6 @@ begin
     sdp_bram_g: if (MFB_REGIONS = 1) generate
         brams_for_channels_g : for mem_arr_idx in 0 to (MEM_ARRAYS -1) generate
             brams_per_byte : for wbyte in 0 to ((MFB_LENGTH/8) -1) generate
-                ram_type_g: if (BUFFER_DEPTH >= 2048) generate
                     sdp_bram_be_i : entity work.SDP_BRAM_BE
                         generic map (
                             BLOCK_ENABLE   => false,
@@ -580,25 +579,6 @@ begin
                             RD_DATA     => rd_data_bram(mem_arr_idx)(0)(wbyte*8 +7 downto wbyte*8),
                             RD_META_OUT => open,
                             RD_DATA_VLD => open);
-
-                else generate
-                    gen_lutram_i: entity work.GEN_LUTRAM
-                        generic map (
-                            DATA_WIDTH         => 8,
-                            ITEMS              => BUFFER_DEPTH*CHANS_PER_ARRAY,
-                            RD_PORTS           => 1,
-                            RD_LATENCY         => 1,
-                            WRITE_USE_RD_ADDR0 => False,
-                            MLAB_CONSTR_RDW_DC => True,
-                            DEVICE             => DEVICE)
-                        port map (
-                            CLK     => CLK,
-                            WR_EN   => wr_be_bram_demux_reg(BRAM_REG_NUM)(mem_arr_idx)(0)(wbyte),
-                            WR_ADDR => wr_addr_bram_by_shift_reg(BRAM_REG_NUM)(0)(wbyte/4),
-                            WR_DATA => wr_data_bram_shifter_reg(BRAM_REG_NUM)(0)(wbyte*8 +7 downto wbyte*8),
-                            RD_ADDR => rd_addr_bram_by_shift(wbyte),
-                            RD_DATA => rd_data_bram(mem_arr_idx)(0)(wbyte*8 +7 downto wbyte*8));
-                end generate;
             end generate;
         end generate;
     end generate;

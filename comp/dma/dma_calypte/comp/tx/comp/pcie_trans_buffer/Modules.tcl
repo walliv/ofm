@@ -8,7 +8,6 @@
 set PKG_BASE            "$OFM_PATH/comp/base/pkg"
 set SDP_BRAM_BASE       "$OFM_PATH/comp/base/mem/sdp_bram"
 set TDP_BRAM_BASE       "$OFM_PATH/comp/base/mem/dp_bram"
-set GEN_LUTRAM_BASE     "$OFM_PATH/comp/base/mem/gen_lutram"
 set BARREL_SHIFTER_BASE "$OFM_PATH/comp/base/logic/barrel_shifter"
 
 # Packages
@@ -18,7 +17,6 @@ lappend PACKAGES "$PKG_BASE/type_pack.vhd"
 # Components
 lappend COMPONENTS [ list "SDP_BRAM"            $SDP_BRAM_BASE          "FULL" ]
 lappend COMPONENTS [ list "TDP_BRAM"            $TDP_BRAM_BASE          "FULL" ]
-lappend COMPONENTS [ list "GEN_LUTRAM"          $GEN_LUTRAM_BASE        "FULL" ]
 lappend COMPONENTS [ list "BARREL_SHIFTER_GEN"  $BARREL_SHIFTER_BASE    "FULL" ]
 
 # Source files for implemented component
