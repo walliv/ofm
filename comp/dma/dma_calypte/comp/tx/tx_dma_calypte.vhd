@@ -280,10 +280,6 @@ architecture FULL of TX_DMA_CALYPTE is
     signal fifox_mult_full          : std_logic;
     signal fifox_mult_rd            : std_logic_vector(0 downto 0);
     signal fifox_mult_empty         : std_logic_vector(0 downto 0);
-
-    -- signal dma_hdr_data             : std_logic_vector(62 + log2(CHANNELS) + 64 - 1 downto 0);
-    -- signal dma_hdr_src_rdy          : std_logic;
-
 begin
 
     assert (
