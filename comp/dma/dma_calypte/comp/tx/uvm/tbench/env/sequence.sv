@@ -56,30 +56,12 @@ class sequence_simple extends uvm_sequence#(uvm_tx_dma_calypte_cq::sequence_item
         m_start_chan_seq.start(null);
 
         while(m_state == null || !m_state.stopped()) begin
-            int unsigned idle_time;
-            int unsigned time_till_stop;
-            string       msg = "";
-
-            // Time for which the channel is turned off
-            std::randomize(idle_time)      with {idle_time      dist {[1: 10] :/ 10, [10:100] :/ 40, [1000:5000] :/ 50};};
-            //Time until the next stop of a channel
-            std::randomize(time_till_stop) with {time_till_stop dist {[1: 10] :/ 10, [10:100] :/ 40, [1000:5000] :/ 50};};
-
-            $swrite(msg, "\n%s\t Time until stop: %0d us\n", msg, time_till_stop*0.1);
-            $swrite(msg,   "%s\t Idle time:       %0d us\n", msg, idle_time*0.1);
-            `uvm_info(this.get_full_name(), msg, UVM_LOW);
-
-            fork
-                send_packets(m_state, 0, 100000);
-
-                begin
-                    #(time_till_stop*100ns);
-                    m_stop_chan_seq.start(null);
-                    #(idle_time*100ns)
-                    m_start_chan_seq.start(null);
-                end
-            join
-
+            send_packets(m_state, 1, 500);
+            m_stop_chan_seq.start(null);
+            send_packets(m_state, 1, 500);
+            m_start_chan_seq.start(null);
         end
+
+        m_stop_chan_seq.start(null);
     endtask
 endclass
